@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import type { ArtifactUploadPayload, IngestPayload } from "@samskara/core"
+import type { ArtifactUploadPayload, CodeStateSnapshot, IngestPayload } from "@samskara/core"
 
 /** `detail` is what the server (or the network) said, so a failure log can name the cause. */
 export type SinkResult = {
@@ -76,6 +76,16 @@ export const createHttpSink = (deps: HttpSinkDeps): Sink => ({
 export const createArtifactSink = (deps: HttpSinkDeps) => ({
   send: (payload: ArtifactUploadPayload): Promise<SinkResult> =>
     post(deps, "/api/artifacts", payload),
+})
+
+export const createStartCodeStateSink = (deps: HttpSinkDeps) => ({
+  send: (payload: CodeStateSnapshot): Promise<SinkResult> =>
+    post(deps, "/api/code-states/start", payload),
+})
+
+export const createEndCodeStateSink = (deps: HttpSinkDeps) => ({
+  send: (payload: CodeStateSnapshot): Promise<SinkResult> =>
+    post(deps, "/api/code-states/end", payload),
 })
 
 export type InMemorySink = Sink & {

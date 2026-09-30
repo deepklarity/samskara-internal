@@ -369,6 +369,34 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("ai review
     expect(await res.json()).toEqual({ error: "analysisAlreadyExists" })
   })
 
+  test("an explicit ai-v2 request can coexist with an existing ai-v1 review", async () => {
+    await db.insert(sessionReviews).values({
+      sessionId,
+      projectId,
+      analyzer: "ai-v1",
+      outcome: "productive",
+      friction: "none",
+      summary: "existing v1 review",
+      signals: {},
+    })
+    const seen: unknown[] = []
+    registry = createAiReviewJobRegistry({
+      run: async (_deps, _userId, _sessionId, options) => {
+        seen.push(options)
+        return { kind: "error", code: "harnessFailed" }
+      },
+    })
+
+    const res = await request(`/api/sessions/${sessionId}/analyze`, {
+      method: "POST",
+      body: { analyzer: "ai-v2" },
+    })
+    expect(res.status).toBe(202)
+    const body = (await res.json()) as { jobId: string }
+    await waitForJob(body.jobId)
+    expect(seen).toContainEqual({ analyzer: "ai-v2" })
+  })
+
   test("A8: GET /:id/aireview carries the running job, and omits the field when none is running", async () => {
     registry = createAiReviewJobRegistry({
       run: () => new Promise<AiReviewResult>(() => {}),
@@ -438,6 +466,13 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("ai review
   })
 
   test("A10: an unrecognized harness or a blank model in the body is 400, not a silent env fallback", async () => {
+    const badAnalyzer = await request(`/api/sessions/${sessionId}/analyze`, {
+      method: "POST",
+      body: { analyzer: "ai-v3" },
+    })
+    expect(badAnalyzer.status).toBe(400)
+    expect(await badAnalyzer.json()).toEqual({ error: "invalidAnalyzer" })
+
     const badHarness = await request(`/api/sessions/${sessionId}/analyze`, {
       method: "POST",
       body: { harness: "cursor" },
@@ -500,6 +535,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("ai review
     }
     expect(body.defaultHarness).toBe("opencode")
     expect(body.defaultModel).toBe("fake-model")
+    expect((body as { codeAwareAvailable?: boolean }).codeAwareAvailable).toBe(false)
     expect(body.harnesses).toEqual([
       {
         harness: "opencode",

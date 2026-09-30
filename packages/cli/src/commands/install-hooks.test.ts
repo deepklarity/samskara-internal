@@ -44,6 +44,13 @@ describe("hook commands", () => {
     expect(text.match(/samskara:ensure/g)).toHaveLength(1)
     expect(text).toContain(process.execPath)
     expect(text).toContain(resolveCliEntry())
+    const installed = JSON.parse(text)
+    const end = installed.hooks.SessionEnd.flatMap(
+      (matcher: { hooks: ReadonlyArray<{ command?: string; timeout?: number }> }) => matcher.hooks,
+    )
+    expect(end).toEqual([expect.objectContaining({ type: "command", timeout: 15 })])
+    expect(end[0].command).toContain(" capture-end # samskara:capture-end")
+    expect(text.match(/samskara:capture-end/g)).toHaveLength(1)
   })
 
   test("EDGE-016: the installed hook points at an entry that exists on disk", async () => {
@@ -99,6 +106,18 @@ describe("hook commands", () => {
               ? installed.hooks.SessionStart
               : []),
           ],
+          SessionEnd: [
+            { hooks: [{ type: "command", command: "echo unrelated end" }] },
+            ...(typeof installed === "object" &&
+            installed !== null &&
+            "hooks" in installed &&
+            typeof installed.hooks === "object" &&
+            installed.hooks !== null &&
+            "SessionEnd" in installed.hooks &&
+            Array.isArray(installed.hooks.SessionEnd)
+              ? installed.hooks.SessionEnd
+              : []),
+          ],
         },
       }),
       "utf8",
@@ -109,7 +128,9 @@ describe("hook commands", () => {
 
     expect(code).toBe(0)
     expect(text).not.toContain("samskara:ensure")
+    expect(text).not.toContain("samskara:capture-end")
     expect(text).toContain("echo unrelated")
+    expect(text).toContain("echo unrelated end")
     expect(text).toContain('"theme": "dark"')
   })
 
@@ -129,6 +150,10 @@ describe("hook commands", () => {
     [
       "a SessionStart matcher without a hooks array",
       JSON.stringify({ hooks: { SessionStart: [{ matcher: "startup", note: "keep-me" }] } }),
+    ],
+    [
+      "a malformed SessionEnd matcher",
+      JSON.stringify({ hooks: { SessionEnd: [{ hooks: "not-an-array" }] } }),
     ],
   ])("EDGE-009: %s fail without being overwritten", async (_case, contents) => {
     const path = await settingsFile()
@@ -206,5 +231,11 @@ describe("hook profiles", () => {
     withProfile("dev")
     expect(uninstallHooksCommand({ settingsPath: path, stdout: quiet })).toBe(0)
     expect(managedCommandsIn(await readFile(path, "utf8"))).toEqual([prodCommand])
+    const remainingEnd = JSON.parse(await readFile(path, "utf8")).hooks.SessionEnd.flatMap(
+      (matcher: { hooks: ReadonlyArray<{ command?: string }> }) => matcher.hooks,
+    )
+    expect(remainingEnd).toHaveLength(1)
+    expect(remainingEnd[0].command).toContain("samskara:capture-end")
+    expect(remainingEnd[0].command).not.toContain("SAMSKARA_PROFILE=dev")
   })
 })

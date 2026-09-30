@@ -1,8 +1,19 @@
 import { randomUUID } from "node:crypto"
-import { mkdir, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises"
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 import {
+  type CodeStateSnapshot,
   createClaudePlugin,
   createLogger,
   type FileSystem,
@@ -18,6 +29,7 @@ import { writeSettings } from "../config/settings.js"
 import { DEFAULT_MESSAGE_CAP, DEFAULT_SESSION_CONCURRENCY } from "../config.js"
 import { enqueue } from "./artifact-queue.js"
 import { runArtifactWorkers } from "./artifact-worker.js"
+import { spoolEndCodeState, spoolStartCodeState } from "./code-state-spool.js"
 import {
   flushCause,
   runCycle,
@@ -582,6 +594,89 @@ describe("watcher driver", () => {
       await runCycle(config, deps({ sink: sink2, glob: async () => [main] }))
       expect(sink2.received[0]).not.toHaveProperty("startCommit")
       expect(headReads).toBe(1)
+    })
+
+    test("uses the hook snapshot for first ingest and retries its upload after ingest", async () => {
+      const main = join(projects, "sess-1.jsonl")
+      await writeFile(main, `${assistantLine("l1", "sess-1", { cwd: "/work/serana" })}\n`, "utf8")
+      const spoolDir = join(dir, "code-states", "start")
+      const snapshot: CodeStateSnapshot = {
+        version: 1,
+        sessionId: "sess-1",
+        phase: "start",
+        captureId: "00000000-0000-4000-8000-000000000001",
+        capturedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: "2026-01-01T00:00:01.000Z",
+        cwd: "/work/serana",
+        repoRoot: "/work/serana",
+        headSha: "b".repeat(40),
+        complete: true,
+        files: [],
+        omissions: [],
+      }
+      await spoolStartCodeState(spoolDir, snapshot)
+      repoMocks.resolveHead.mockResolvedValue("c".repeat(40))
+      const ingest = createInMemorySink()
+      const send = vi
+        .fn()
+        .mockResolvedValueOnce({ status: 409 })
+        .mockResolvedValueOnce({ status: 201 })
+      const cycleConfig = { ...config, startCodeStateSpoolDir: spoolDir }
+      const cycleDeps = deps({
+        sink: ingest,
+        startCodeStateSink: { send },
+        glob: async () => [main],
+      })
+
+      await runCycle(cycleConfig, cycleDeps)
+      expect(ingest.received[0]).toMatchObject({
+        startCwd: snapshot.cwd,
+        startCommit: snapshot.headSha,
+      })
+      expect(repoMocks.resolveHead).not.toHaveBeenCalled()
+      expect(send).toHaveBeenCalledWith(snapshot)
+      expect(await readdir(spoolDir)).toHaveLength(1)
+
+      await runCycle(cycleConfig, cycleDeps)
+      expect(send).toHaveBeenCalledTimes(2)
+      expect(await readdir(spoolDir)).toHaveLength(0)
+    })
+
+    test("uploads an end capture after ingest and retries it on a later empty cycle", async () => {
+      const main = join(projects, "sess-1.jsonl")
+      await writeFile(main, `${assistantLine("l1", "sess-1")}\n`, "utf8")
+      const spoolDir = join(dir, "code-states", "end")
+      const snapshot: CodeStateSnapshot = {
+        version: 1,
+        sessionId: "sess-1",
+        phase: "end",
+        captureId: "00000000-0000-4000-8000-000000000003",
+        capturedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: "2026-01-01T00:00:01.000Z",
+        cwd: "/work/app",
+        repoRoot: "/work/app",
+        headSha: "b".repeat(40),
+        complete: true,
+        files: [],
+        omissions: [],
+      }
+      await spoolEndCodeState(spoolDir, snapshot, "logout")
+      const ingest = createInMemorySink()
+      const send = vi
+        .fn()
+        .mockResolvedValueOnce({ status: 409 })
+        .mockResolvedValueOnce({ status: 201 })
+      const cycleConfig = { ...config, endCodeStateSpoolDir: spoolDir }
+      const cycleDeps = deps({ sink: ingest, endCodeStateSink: { send }, glob: async () => [main] })
+
+      await runCycle(cycleConfig, cycleDeps)
+      expect(ingest.received).toHaveLength(1)
+      expect(send).toHaveBeenCalledWith(snapshot)
+      expect(await readdir(spoolDir)).toHaveLength(1)
+
+      await runCycle(cycleConfig, cycleDeps)
+      expect(send).toHaveBeenCalledTimes(2)
+      expect(await readdir(spoolDir)).toHaveLength(0)
     })
 
     test("a subagent flush carries no session origin, so it cannot re-stamp the session it belongs to", async () => {

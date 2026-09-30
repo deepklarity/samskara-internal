@@ -182,6 +182,109 @@ export type AiReviewSignals = {
   readonly totalDurationMs?: number
   readonly run?: AiReviewRun
   readonly partial?: AiReviewPartial
+  readonly improvements?: {
+    readonly lens: "improvements"
+    readonly entries: ReadonlyArray<{
+      readonly title: string
+      readonly detail: string
+      readonly sessionTrigger: string
+      readonly systemGap: string
+      readonly codeProof?: string
+      readonly futureReuse: string
+      readonly proposedChange: string
+      readonly counterfactual: string
+      readonly validationIdea: string
+      readonly status: "unverified" | "already-present" | "resolved-in-session" | "pending"
+      readonly evidenceBasis: "session-only" | "code-backed"
+      readonly sessionEvidence: ReadonlyArray<{
+        readonly seq: number
+        readonly messageId: string
+        readonly what: string
+      }>
+      readonly codeEvidence: ReadonlyArray<{
+        readonly repo: string
+        readonly path: string
+        readonly revision: string
+        readonly hash?: string
+        readonly fromLine?: number
+        readonly toLine?: number
+      }>
+    }>
+  }
+  readonly evidence?: {
+    readonly startCommit: string | null
+    readonly tree: {
+      readonly available: boolean
+      readonly source: string
+      readonly reason?: string
+      readonly files?: ReadonlyArray<{ readonly path: string }>
+      readonly omissions?: ReadonlyArray<{
+        readonly source: string
+        readonly path: string
+        readonly reason: string
+        readonly phase?: "start" | "after"
+      }>
+    }
+    readonly states?: {
+      readonly afterSource?: "session-end" | "review-time" | "none"
+      readonly start?: {
+        readonly captureId: string
+        readonly headSha?: string
+        readonly capturedAt: string
+        readonly completedAt: string
+        readonly complete: boolean
+        readonly files: ReadonlyArray<{
+          readonly path: string
+          readonly layer: string
+          readonly kind: string
+        }>
+        readonly omissions: ReadonlyArray<{ readonly reason: string; readonly path?: string }>
+      }
+      readonly review?: {
+        readonly captureId: string
+        readonly headSha?: string
+        readonly capturedAt: string
+        readonly completedAt: string
+        readonly complete: boolean
+        readonly files: ReadonlyArray<{
+          readonly path: string
+          readonly layer: string
+          readonly kind: string
+        }>
+        readonly omissions: ReadonlyArray<{ readonly reason: string; readonly path?: string }>
+      }
+      readonly end?: {
+        readonly captureId: string
+        readonly headSha?: string
+        readonly capturedAt: string
+        readonly completedAt: string
+        readonly complete: boolean
+        readonly files: ReadonlyArray<{
+          readonly path: string
+          readonly layer: string
+          readonly kind: string
+        }>
+        readonly omissions: ReadonlyArray<{ readonly reason: string; readonly path?: string }>
+      }
+      readonly afterTree?: {
+        readonly available: boolean
+        readonly files?: ReadonlyArray<{ readonly path: string }>
+        readonly omissions?: ReadonlyArray<{
+          readonly source: string
+          readonly path: string
+          readonly reason: string
+          readonly phase?: "start" | "after"
+        }>
+      }
+    }
+    readonly omissions: ReadonlyArray<{
+      readonly source: string
+      readonly path: string
+      readonly reason: string
+      readonly phase?: "start" | "after"
+    }>
+    readonly notes: ReadonlyArray<string>
+  }
 }
 
 /** One ai-v1 review as GET /:id/aireview returns it (also carried by the review list row). */

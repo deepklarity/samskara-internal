@@ -2,9 +2,35 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createLogger } from "@samskara/core"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import { buildApp } from "./app.js"
+import { buildApp, dispatchAiReviewRunner } from "./app.js"
 import type { Db } from "./db/client.js"
 import type { Env } from "./lib/env.js"
+import type { HarnessRunner } from "./services/ai-review/runner.js"
+
+test("code-aware reviews use MSB even when standard reviews use the soft runner", async () => {
+  const calls: string[] = []
+  const runner = (name: string): HarnessRunner => ({
+    run: async () => {
+      calls.push(name)
+      return { stdout: "", exitCode: 0, firstByteMs: null }
+    },
+  })
+  const routed = dispatchAiReviewRunner({
+    claude: runner("claude"),
+    softOpencode: runner("soft"),
+    msbOpencode: runner("msb"),
+    useSoftOpencode: true,
+  })
+  await routed.run({ prompt: "", workspaceDir: "/tmp/work", harness: "opencode" })
+  await routed.run({
+    prompt: "",
+    workspaceDir: "/tmp/work",
+    harness: "opencode",
+    codeDir: "/tmp/code",
+  })
+  await routed.run({ prompt: "", workspaceDir: "/tmp/work", harness: "claude" })
+  expect(calls).toEqual(["soft", "msb", "claude"])
+})
 
 const silentLog = () => createLogger({ service: "test" }, { level: "silent" })
 

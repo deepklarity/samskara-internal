@@ -58,6 +58,18 @@ export const REVIEW_XML_TAGS = [
   "humanLearnings",
   "agentLearnings",
   "breadcrumbs",
+  "improvements",
+  "improvement",
+  "sessionTrigger",
+  "systemGap",
+  "codeProof",
+  "futureReuse",
+  "proposedChange",
+  "counterfactual",
+  "validationIdea",
+  "sessionEvidence",
+  "codeEvidence",
+  "citation",
   "learning",
   "detail",
   "nextTime",
@@ -127,12 +139,13 @@ type Token =
   | { kind: "open"; name: string; attrs: Record<string, string>; selfClosing: boolean }
   | { kind: "close"; name: string }
 
-type Element = {
+export type ReviewXmlElement = {
   name: string
   attrs: Readonly<Record<string, string>>
-  children: Element[]
+  children: ReviewXmlElement[]
   text: string
 }
+type Element = ReviewXmlElement
 
 // --- the template (contract v2): pre-written review.xml the pipeline drops in the workspace ---
 
@@ -285,6 +298,9 @@ const decodeEntities = (text: string): string =>
       }
     }
   })
+
+/** Entity decoding shared by the versioned XML readers. */
+export const reviewXmlDecodeEntities = decodeEntities
 
 const parseAttrs = (blob: string): Record<string, string> => {
   const attrs: Record<string, string> = {}
@@ -491,6 +507,17 @@ const buildTree = (tokens: ReadonlyArray<Token>, healed: string[]): Element | nu
     return root
   }
   return null
+}
+
+/** Shared XML tree reader for versioned contracts. It uses the same recovery passes as v1. */
+export const reviewXmlTree = (text: string): ReviewXmlElement | null => {
+  const salvaged = salvageXml(text)
+  if (salvaged === null) return null
+  const recovered: string[] = []
+  return buildTree(
+    balance(tokenize(escapeBareMarkup(salvaged.xml, recovered)), recovered),
+    recovered,
+  )
 }
 
 // --- per-element salvage and text normalization ---------------------------------------------

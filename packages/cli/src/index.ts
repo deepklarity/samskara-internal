@@ -3,9 +3,11 @@ import { realpathSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { Command } from "commander"
 import { uploadArtifactsCommand } from "./commands/artifacts.js"
+import { captureEndCommand } from "./commands/capture-end.js"
 import { disableCommand } from "./commands/disable.js"
 import { enableCommand } from "./commands/enable.js"
 import { ensureCommand } from "./commands/ensure.js"
+import { readSessionEndInput, readSessionStartInput } from "./commands/hook-input.js"
 import { initCommand } from "./commands/init.js"
 import { installHooksCommand, uninstallHooksCommand } from "./commands/install-hooks.js"
 import { learnCommand } from "./commands/learn.js"
@@ -299,7 +301,18 @@ program
   .command("ensure", { hidden: true })
   .description("SessionStart hook entry point")
   .action(async () => {
-    process.exitCode = await ensureCommand()
+    process.exitCode = await ensureCommand({
+      hookInput: await readSessionStartInput(process.stdin),
+    })
+  })
+
+program
+  .command("capture-end", { hidden: true })
+  .description("SessionEnd hook entry point")
+  .action(async () => {
+    process.exitCode = await captureEndCommand({
+      hookInput: await readSessionEndInput(process.stdin),
+    })
   })
 
 if (isMain) void program.parseAsync()

@@ -32,6 +32,8 @@ export const watchPidPath = (): string => join(configHome(), "watch.pid")
 // so one corrupt artifact entry would wipe every transcript checkpoint.
 export const artifactStatePath = (): string => join(configHome(), "artifacts.json")
 export const artifactQueuePath = (): string => join(configHome(), "artifact-queue.json")
+export const startCodeStateSpoolDir = (): string => join(configHome(), "code-states", "start")
+export const endCodeStateSpoolDir = (): string => join(configHome(), "code-states", "end")
 export const watchLogDir = (): string => join(configHome(), "logs")
 export const currentLogPath = (): string => join(watchLogDir(), "current.log")
 export const watcherCrashLogPath = (): string => join(watchLogDir(), "watch.crash.log")

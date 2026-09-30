@@ -31,7 +31,7 @@ const BaseEnvSchema = z.object({
   AI_REVIEW_TIMEOUT_MS: z
     .string()
     .regex(/^\d+$/, "AI_REVIEW_TIMEOUT_MS must be digits (milliseconds)")
-    .default("600000")
+    .default("900000")
     .transform((value) => Number(value)),
 })
 

@@ -1,0 +1,2 @@
+ALTER TABLE "codeStateSnapshots" DROP CONSTRAINT "codeStateSnapshots_phase_check";--> statement-breakpoint
+ALTER TABLE "codeStateSnapshots" ADD CONSTRAINT "codeStateSnapshots_phase_check" CHECK ("codeStateSnapshots"."phase" in ('start', 'end', 'review'));

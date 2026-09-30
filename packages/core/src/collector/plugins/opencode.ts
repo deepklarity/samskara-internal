@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
+import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
@@ -30,6 +31,11 @@ import type {
  * Bun cannot yet dlopen better-sqlite3 (bun #4290), which is why the dev path does not use
  * it -- and node:sqlite would need a Node-22-only experimental flag we do not want to
  * require from operators.
+ *
+ * The Node branch must load better-sqlite3 through createRequire(import.meta.url), never a
+ * bare `require(...)`: the dist runs as plain Node ESM, where bare `require` is a
+ * ReferenceError. bun/tsx/vitest all shim `require` in, so only a test that drives real
+ * Node ESM (opencode.esm.test.ts) can catch a regression here.
  */
 type SqliteStatement = {
   readonly all: (...params: ReadonlyArray<unknown>) => ReadonlyArray<Record<string, unknown>>
@@ -70,8 +76,12 @@ const loadDriver = (): {
       },
     }
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require("better-sqlite3") as new (
+  // Bare `require` does not exist in the compiled ESM the released CLI runs under Node --
+  // bun, tsx and vitest all shim one in, which is exactly how this broke silently for so
+  // long. createResolve against this module's own URL resolves better-sqlite3 from the
+  // package's node_modules no matter which dist file the graph was entered through.
+  const nodeRequire = createRequire(import.meta.url)
+  const Database = nodeRequire("better-sqlite3") as new (
     path: string,
     options: { readonly: boolean; fileMustExist: boolean },
   ) => {

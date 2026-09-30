@@ -56,6 +56,8 @@ const statusSchema = z.enum(["candidate", "accepted", "superseded"])
 /** The per-run reviewer choice the modal posts; absent fields keep the env defaults. */
 const analyzeBodySchema = z
   .object({
+    /** Explicit opt-in while the code-aware contract is evaluated beside ai-v1. */
+    analyzer: z.enum(["ai-v1", "ai-v2"]).optional(),
     harness: z.enum(["opencode", "claude"]).optional(),
     model: z.string().trim().min(1).max(100).optional(),
     /** Replace an existing ai-v1 review — the Redo path. The upsert supersedes in place. */
@@ -142,6 +144,7 @@ export const reviewerOptionsRoutes = ({
       {
         defaultHarness: env.aiReviewHarness,
         defaultModel: env.aiReviewModel,
+        codeAwareAvailable: exists("msb"),
         harnesses,
       },
       200,
@@ -237,6 +240,7 @@ export const reviewRoutes = ({ db, env, aiReviewRunner, aiReviewJobs }: AiReview
         )
         const field = result.error.issues[0]?.path[0]
         const codes: Record<string, string> = {
+          analyzer: "invalidAnalyzer",
           harness: "invalidHarness",
           model: "invalidModel",
           force: "invalidForce",
@@ -253,7 +257,8 @@ export const reviewRoutes = ({ db, env, aiReviewRunner, aiReviewJobs }: AiReview
         if (aiReviewJobs.activeJobForSession(sessionId) !== undefined)
           return c.json({ error: "analysisAlreadyRunning" }, 409)
         const rows = await listReviewsForSession(db, userId, sessionId)
-        const hasReview = rows.some((review) => review.analyzer === "ai-v1")
+        const analyzer = c.req.valid("json")?.analyzer ?? "ai-v1"
+        const hasReview = rows.some((review) => review.analyzer === analyzer)
         // A landed review blocks a re-run unless the caller asked to redo — the pipeline's
         // upsert supersedes the old row in place, so a redo replaces rather than duplicates.
         if (hasReview && c.req.valid("json")?.force !== true)

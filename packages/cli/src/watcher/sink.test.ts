@@ -1,6 +1,11 @@
 import type { IngestPayload } from "@samskara/core"
 import { describe, expect, test, vi } from "vitest"
-import { createArtifactSink, createHttpSink } from "./sink.js"
+import {
+  createArtifactSink,
+  createEndCodeStateSink,
+  createHttpSink,
+  createStartCodeStateSink,
+} from "./sink.js"
 
 const payload: IngestPayload = {
   type: "main",
@@ -103,6 +108,27 @@ describe("createArtifactSink", () => {
 
     expect(authOf(fetch)).toEqual(["Bearer stale", "Bearer fresh"])
   })
+})
+
+test("start code state sink posts the immutable snapshot to its own endpoint", async () => {
+  const fetch = respond(201, "{}")
+  const sink = createStartCodeStateSink({
+    apiBase: "http://api",
+    readToken: async () => "t",
+    fetch,
+  })
+  const snapshot = { version: 1, phase: "start", sessionId: "sess-1" } as never
+  expect((await sink.send(snapshot)).status).toBe(201)
+  expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe("http://api/api/code-states/start")
+  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body))).toEqual(snapshot)
+})
+
+test("end code state sink posts each capture to the end endpoint", async () => {
+  const fetch = respond(201, "{}")
+  const sink = createEndCodeStateSink({ apiBase: "http://api", readToken: async () => "t", fetch })
+  const snapshot = { version: 1, phase: "end", sessionId: "sess-1" } as never
+  expect((await sink.send(snapshot)).status).toBe(201)
+  expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe("http://api/api/code-states/end")
 })
 
 const requestIdsOf = (fetch: ReturnType<typeof respond>): ReadonlyArray<string | undefined> =>

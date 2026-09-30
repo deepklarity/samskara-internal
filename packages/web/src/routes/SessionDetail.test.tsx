@@ -162,6 +162,7 @@ const REVIEWER_OPTIONS: Reply = {
   body: {
     defaultHarness: "opencode",
     defaultModel: "zai-coding-plan/glm-5.3-flash",
+    codeAwareAvailable: true,
     harnesses: [
       {
         harness: "opencode",
@@ -193,6 +194,7 @@ const renderDetail = (
     readonly aireview?: Reply | ReadonlyArray<Reply>
     /** What GET /review answers once an aireview reply landed 200: analyze writes the ai-v1 row. */
     readonly reviewAfterAi?: Reply
+    readonly reviewerOptions?: Reply
   } = {},
 ) => {
   const review = extras.review ?? { status: 200, body: { reviews: [] } }
@@ -269,7 +271,7 @@ const renderDetail = (
     }
     // Before the /review branch: "/reviewer-options" contains "/review" as a substring.
     if (url.includes("/reviewer-options")) {
-      return respond(REVIEWER_OPTIONS)
+      return respond(extras.reviewerOptions ?? REVIEWER_OPTIONS)
     }
     if (url.includes("/review")) {
       const after = aiLanded || existsConflict ? extras.reviewAfterAi : undefined
@@ -1678,6 +1680,117 @@ test("AI review: the modal offers the server's reviewer choices and posts the pi
 
   await user.click(screen.getByRole("button", { name: "Run analysis" }))
   expect(view.analyzeBodies.at(-1)).toEqual({ harness: "claude", model: "sonnet" })
+})
+
+test("AI review: the dialog opts into code-aware analysis with the MSB harness", async () => {
+  const user = userEvent.setup()
+  const view = renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1")
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+  await user.click(await within(panelOf()).findByRole("button", { name: /analyze with ai/i }))
+  await user.selectOptions(await screen.findByLabelText("Analysis type"), "ai-v2")
+  expect(screen.getByLabelText("Reviewer harness")).toHaveValue("opencode")
+  expect(screen.getByRole("option", { name: "claude" })).toBeDisabled()
+  await user.click(screen.getByRole("button", { name: "Run analysis" }))
+  expect(view.analyzeBodies.at(-1)).toEqual({
+    analyzer: "ai-v2",
+    harness: "opencode",
+    model: "zai-coding-plan/glm-5.3-flash",
+  })
+})
+
+test("AI review: code-aware option is unavailable when MSB is missing", async () => {
+  const user = userEvent.setup()
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    reviewerOptions: {
+      ...REVIEWER_OPTIONS,
+      body: { ...(REVIEWER_OPTIONS.body as object), codeAwareAvailable: false },
+    },
+  })
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+  await user.click(await within(panelOf()).findByRole("button", { name: /analyze with ai/i }))
+  expect(await screen.findByRole("option", { name: "Code-aware review" })).toBeDisabled()
+})
+
+test("AI review: code-aware findings and evidence can be viewed beside the original review", async () => {
+  const user = userEvent.setup()
+  const codeReview = {
+    ...AI_REVIEW_ROW,
+    id: "rev-ai-2",
+    analyzer: "ai-v2",
+    summary: "The agent rebuilt an existing helper.",
+    signals: {
+      ...AI_REVIEW_ROW.signals,
+      improvements: {
+        lens: "improvements",
+        entries: [
+          {
+            title: "Link the existing helper",
+            detail: "The session agent rebuilt a helper already in the start tree.",
+            sessionTrigger: "The agent rebuilt the helper in this session.",
+            systemGap: "The existing helper was hard to discover.",
+            codeProof: "The start tree proves the helper existed before the session.",
+            futureReuse: "Similar tasks can find and use the helper.",
+            proposedChange: "Link the helper from the skill.",
+            counterfactual: "The agent would likely have skipped rebuilding the helper.",
+            validationIdea: "Check a later session for helper use.",
+            status: "already-present",
+            evidenceBasis: "code-backed",
+            sessionEvidence: [{ seq: 2, messageId: "m-2", what: "agent rebuilt helper" }],
+            codeEvidence: [
+              {
+                repo: "github.com/acme/app",
+                path: "src/helper.ts",
+                revision: "abc123",
+                fromLine: 4,
+                toLine: 9,
+              },
+            ],
+          },
+        ],
+      },
+      evidence: {
+        startCommit: "abc123",
+        tree: {
+          available: true,
+          source: "local",
+          files: [],
+          artifactBaseOverlays: [],
+          confidence: "best-known",
+        },
+        artifacts: [],
+        commits: [],
+        omissions: [],
+        notes: [],
+      },
+    },
+  }
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [AI_REVIEW_ROW, codeReview, REVIEW] } },
+  })
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+  expect(within(panelOf()).getByText("Clean run: one prompt, one migration.")).toBeInTheDocument()
+  await user.click(within(panelOf()).getByRole("button", { name: "Code-aware review" }))
+  expect(within(panelOf()).getByText("The agent rebuilt an existing helper.")).toBeInTheDocument()
+  expect(within(panelOf()).getByText("Link the existing helper")).toBeInTheDocument()
+  expect(within(panelOf()).getByText("Already present")).toBeInTheDocument()
+  expect(within(panelOf()).getByText(/src\/helper.ts:4–9/)).toBeInTheDocument()
+  expect(within(panelOf()).getByText(/Start commit abc123/)).toBeInTheDocument()
+})
+
+test("AI review: an existing standard review offers a separate code-aware run", async () => {
+  const user = userEvent.setup()
+  const view = renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [AI_REVIEW_ROW, REVIEW] } },
+  })
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+  await user.click(within(panelOf()).getByRole("button", { name: "Code-aware review · Run" }))
+  expect(await screen.findByLabelText("Analysis type")).toHaveValue("ai-v2")
+  await user.click(screen.getByRole("button", { name: "Run analysis" }))
+  expect(view.analyzeBodies.at(-1)).toMatchObject({ analyzer: "ai-v2", harness: "opencode" })
 })
 
 test("AI review: a failed job surfaces its reason, re-enables Analyze, and stops saying Analyzing", async () => {

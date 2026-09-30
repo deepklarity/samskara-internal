@@ -534,3 +534,27 @@ export const artifact = pgTable(
     ),
   ],
 )
+
+/** Immutable bounded Git working-tree captures. Review captures are keyed by captureId;
+ * the partial unique index ensures a later poll cannot replace the true start capture. */
+export const codeStateSnapshots = pgTable(
+  "codeStateSnapshots",
+  {
+    captureId: uuid("captureId").primaryKey(),
+    sessionId: text("sessionId")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    phase: text("phase").notNull(),
+    capturedAt: timestamp("capturedAt", { withTimezone: true }).notNull(),
+    completedAt: timestamp("completedAt", { withTimezone: true }).notNull(),
+    snapshot: jsonb("snapshot").notNull(),
+    createdAt,
+  },
+  (t) => [
+    check("codeStateSnapshots_phase_check", sql`${t.phase} in ('start', 'end', 'review')`),
+    uniqueIndex("codeStateSnapshots_one_start_idx")
+      .on(t.sessionId)
+      .where(sql`${t.phase} = 'start'`),
+    index("codeStateSnapshots_session_phase_idx").on(t.sessionId, t.phase),
+  ],
+)

@@ -1,4 +1,11 @@
-import { chmodSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createLogger } from "@samskara/core"
@@ -26,6 +33,14 @@ type CapturedInvocation = {
 }
 
 describe("createOpencodeRunner", () => {
+  test("R0: refuses code evidence because the soft runner cannot enforce a read-only mount", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-runner-test-"))
+    const runner = createOpencodeRunner({ model: "fake-model", timeoutMs: 10_000, log: log() })
+    await expect(
+      runner.run({ prompt: "p", workspaceDir, codeDir: join(workspaceDir, "code") }),
+    ).rejects.toThrow(/read-only.*MSB/i)
+  })
+
   test("R1: runs the command in the workspace dir, prompt as one arg, and returns captured stdout", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-runner-test-"))
     // A fake opencode: prints the cwd, the model flag position ($3) and the prompt ($4),
@@ -89,6 +104,14 @@ describe("createOpencodeRunner", () => {
 })
 
 describe("createClaudeRunner", () => {
+  test("R3a: refuses code evidence because the soft runner cannot enforce a read-only mount", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-claude-test-"))
+    const runner = createClaudeRunner({ model: "sonnet", timeoutMs: 10_000, log: log() })
+    await expect(
+      runner.run({ prompt: "p", workspaceDir, codeDir: join(workspaceDir, "code") }),
+    ).rejects.toThrow(/read-only.*MSB/i)
+  })
+
   test("R3: runs claude -p with the prompt and model in the workspace, HOME and CLAUDE_CONFIG_DIR redirected into it", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-claude-test-"))
     const capturePath = join(workspaceDir, "captured.json")
@@ -198,6 +221,7 @@ const writeFakeMsb = (workspaceDir: string, capturePath: string): string => {
     script,
     [
       "#!/usr/bin/env bash",
+      `if [ "$1" = "remove" ]; then node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify(process.argv.slice(2)))' "${capturePath}.cleanup" "$@"; exit 0; fi`,
       `node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({argv: process.argv.slice(2), cwd: process.cwd(), env: process.env}, null, 2))' "${capturePath}" "$@"`,
       // The harness expects `opencode run` inside the VM to print a review on stdout. The
       // fake shim is what the parent sees, so it must emit *some* stdout — the pipeline's
@@ -212,6 +236,33 @@ const writeFakeMsb = (workspaceDir: string, capturePath: string): string => {
 }
 
 describe("createMsbWrappedRunner", () => {
+  test("MR0: mounts code evidence separately as read-only while keeping /work writable", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-msb-test-"))
+    const codeDir = mkdtempSync(join(tmpdir(), "samskara-code-test-"))
+    const capturePath = join(workspaceDir, "captured.json")
+    const fakeMsb = writeFakeMsb(workspaceDir, capturePath)
+    const runner = createMsbWrappedRunner({
+      model: "fake-model",
+      timeoutMs: 30_000,
+      log: log(),
+      msbBin: fakeMsb,
+      msbSnapshot: "opencode-with-cli",
+    })
+
+    await runner.run({ prompt: "p", workspaceDir, codeDir })
+
+    const { argv } = JSON.parse(readFileSync(capturePath, "utf8")) as CapturedInvocation
+    expect(argv).toContain(`${workspaceDir}:/work`)
+    expect(argv).toContain(`${codeDir}:/code:ro`)
+    expect(argv).not.toContain(`${codeDir}:/code`)
+    expect(JSON.parse(readFileSync(`${capturePath}.cleanup`, "utf8"))).toEqual([
+      "remove",
+      "--force",
+      "--quiet",
+      argv[argv.indexOf("--name") + 1],
+    ])
+  })
+
   test("MR1: wraps opencode in `msb run`, mounts the workspace, sets XDG inside the VM", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-msb-test-"))
     const capturePath = join(workspaceDir, "captured.json")
@@ -267,7 +318,7 @@ describe("createMsbWrappedRunner", () => {
     expect(inner).toContain("-lc")
     const bootstrap = inner[inner.indexOf("-lc") + 1] ?? ""
     expect(bootstrap).toContain("npm i -g opencode-ai@")
-    expect(bootstrap).toContain("opencode run --model zai-coding-plan/glm-5.3")
+    expect(bootstrap).toContain("opencode run --auto --model zai-coding-plan/glm-5.3")
     expect(bootstrap).toContain("'review this session'")
     // The host workspace path must not leak into the guest's command line.
     expect(inner.join(" ")).not.toContain(workspaceDir)
@@ -308,6 +359,15 @@ describe("createMsbWrappedRunner", () => {
     expect(args).toContain("opencode-with-cli")
     // Image positional is absent when a snapshot is in use.
     expect(args).not.toContain("node:22-slim")
+    expect(args.slice(args.indexOf("--") + 1)).toEqual([
+      "opencode",
+      "run",
+      "--auto",
+      "--model",
+      "x",
+      "p",
+      "</dev/null>",
+    ])
   })
 
   test("MR4: the workspace's xdg-data is the in-guest XDG_DATA_HOME — no host paths leak", () => {
@@ -383,6 +443,7 @@ describe("createMsbWrappedRunner", () => {
       script,
       [
         "#!/usr/bin/env bash",
+        'if [ "$1" = "remove" ]; then exit 0; fi',
         `node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({argv: process.argv.slice(2)}, null, 2))' "${capturePath}" "$@"`,
         'NAME=""; while [[ $# -gt 0 ]]; do if [[ "$1" == "--name" ]]; then NAME="$2"; fi; shift; done',
         'LOGDIR="$HOME/.microsandbox/sandboxes/$NAME/logs"',
@@ -438,4 +499,76 @@ describe("createMsbWrappedRunner", () => {
     expect(result.logPath).toBeUndefined()
     expect(result.agentLog).toContain("harness stdout says hi")
   })
+
+  test.each([
+    { failure: "nonzero", ending: "exit 42", timedOut: false },
+    { failure: "timeout", ending: "kill -TERM $$", timedOut: true },
+  ])(
+    "MR8: $failure retains a bounded exec.log trace before sandbox cleanup",
+    async ({ ending, timedOut }) => {
+      const scratchHome = mkdtempSync(join(tmpdir(), "samskara-msb-failure-home-"))
+      process.env.HOME = scratchHome
+      const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-msb-failure-test-"))
+      const cleanupPath = join(workspaceDir, "cleanup.json")
+      const script = join(workspaceDir, "fake-msb.sh")
+      writeFileSync(
+        script,
+        [
+          "#!/usr/bin/env bash",
+          'if [ "$1" = "remove" ]; then',
+          '  NAME="$4"',
+          '  LOGFILE="$HOME/.microsandbox/sandboxes/$NAME/logs/exec.log"',
+          `  node -e 'const fs=require("fs"); fs.writeFileSync(process.argv[1], JSON.stringify({argv:process.argv.slice(3), logExisted:fs.existsSync(process.argv[2])})); fs.rmSync(process.argv[2], {force:true})' "${cleanupPath}" "$LOGFILE" "$@"`,
+          "  exit 0",
+          "fi",
+          'NAME=""; while [[ $# -gt 0 ]]; do if [[ "$1" == "--name" ]]; then NAME="$2"; fi; shift; done',
+          'LOGDIR="$HOME/.microsandbox/sandboxes/$NAME/logs"',
+          'mkdir -p "$LOGDIR"',
+          'node -e \'const fs=require("fs"); const commands=Array.from({length:180},(_,i)=>({t:i,s:"stderr",d:"\\u001b[0m$ echo "+"x".repeat(180)})); commands.push({t:181,s:"stderr",d:"\\u001b[0m$ final diagnostic command"}); fs.writeFileSync(process.argv[1],commands.map(r=>JSON.stringify(r)).join("\\n")+"\\n")\' "$LOGDIR/exec.log"',
+          'echo "msb failed" >&2',
+          ending,
+        ].join("\n"),
+      )
+      chmodSync(script, 0o755)
+
+      const runner = createMsbWrappedRunner({
+        model: "m",
+        timeoutMs: 30_000,
+        log: log(),
+        msbBin: script,
+      })
+      let failure: unknown
+      try {
+        await runner.run({ prompt: "p", workspaceDir })
+      } catch (error) {
+        failure = error
+      }
+
+      const cleanup = JSON.parse(readFileSync(cleanupPath, "utf8")) as {
+        argv: string[]
+        logExisted: boolean
+      }
+      expect(cleanup.argv.slice(0, 3)).toEqual(["remove", "--force", "--quiet"])
+      expect(cleanup.logExisted).toBe(true)
+      const logPath = join(
+        scratchHome,
+        ".microsandbox",
+        "sandboxes",
+        cleanup.argv[3] ?? "",
+        "logs",
+        "exec.log",
+      )
+      expect(existsSync(logPath)).toBe(false)
+      expect(failure).toMatchObject({
+        name: "HarnessRunnerError",
+        stderr: expect.stringContaining("msb failed"),
+        timedOut,
+        logPath,
+        agentLog: expect.stringContaining("final diagnostic command"),
+      })
+      expect((failure as { agentLog?: string }).agentLog?.length).toBeLessThanOrEqual(
+        MAX_AGENT_LOG_CHARS,
+      )
+    },
+  )
 })

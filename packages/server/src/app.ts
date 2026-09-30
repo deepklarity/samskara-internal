@@ -7,6 +7,7 @@ import type { Env } from "./lib/env.js"
 import { loggingMiddleware } from "./lib/logging-middleware.js"
 import { artifactRoutes } from "./routes/artifacts.js"
 import { authRoutes } from "./routes/auth.js"
+import { codeStateRoutes } from "./routes/code-states.js"
 import { ingestRoutes } from "./routes/ingest.js"
 import { orgsRoutes } from "./routes/orgs.js"
 import { projectsRoutes } from "./routes/projects.js"
@@ -43,7 +44,8 @@ type Variables = { log: pino.Logger }
  * - `opencode` is hard-sandboxed — it runs inside a microsandbox (libkrun microVM) via the
  *   `msb` CLI, with no view of the host filesystem except the bind mounts we hand it, so a
  *   reviewer cannot reach the user's real opencode db or any other session state.
- *   `AI_REVIEW_HARDEN=0` falls back to the in-process runner used in tests.
+ *   `AI_REVIEW_HARDEN=0` uses the in-process runner for standard reviews. Reviews with
+ *   read-only historical code still use MSB so the /code mount is enforced.
  * - `claude` always uses the in-process runner (Claude Code reads its credentials from
  *   CLAUDE_CONFIG_DIR, which the runner redirects into the workspace — the msb bootstrap
  *   only knows how to npm-install opencode, so a claude-in-microVM image is separate
@@ -52,6 +54,22 @@ type Variables = { log: pino.Logger }
  *   lets the reviewer read the session under review directly, so prefer `claude
  *   setup-token` + `CLAUDE_CODE_OAUTH_TOKEN` and keep the sandbox.
  */
+export const dispatchAiReviewRunner = (input: {
+  readonly claude: HarnessRunner
+  readonly softOpencode: HarnessRunner
+  readonly msbOpencode: HarnessRunner
+  readonly useSoftOpencode: boolean
+}): HarnessRunner => ({
+  run: (runInput) =>
+    runInput.codeDir !== undefined
+      ? input.msbOpencode.run(runInput)
+      : runInput.harness === "claude"
+        ? input.claude.run(runInput)
+        : input.useSoftOpencode
+          ? input.softOpencode.run(runInput)
+          : input.msbOpencode.run(runInput),
+})
+
 const defaultAiReviewRunner = (env: Env, log: pino.Logger): HarnessRunner => {
   const claude = createClaudeRunner({
     model: env.aiReviewModel,
@@ -59,30 +77,29 @@ const defaultAiReviewRunner = (env: Env, log: pino.Logger): HarnessRunner => {
     log: log.child({ component: "ai-review", harness: "claude" }),
     ...(process.env.AI_REVIEW_CLAUDE_SANDBOX === "0" ? { sandboxHome: false } : {}),
   })
-  const opencode: HarnessRunner =
-    process.env.AI_REVIEW_HARDEN === "0"
-      ? createOpencodeRunner({
-          model: env.aiReviewModel,
-          timeoutMs: env.aiReviewTimeoutMs,
-          log: log.child({ component: "ai-review", sandbox: "soft" }),
-        })
-      : createMsbWrappedRunner({
-          model: env.aiReviewModel,
-          timeoutMs: env.aiReviewTimeoutMs,
-          log: log.child({ component: "ai-review", sandbox: "msb" }),
-          ...(process.env.AI_REVIEW_IMAGE !== undefined
-            ? { image: process.env.AI_REVIEW_IMAGE }
-            : {}),
-          ...(process.env.AI_REVIEW_SNAPSHOT !== undefined
-            ? { msbSnapshot: process.env.AI_REVIEW_SNAPSHOT }
-            : {}),
-          ...(process.env.AI_REVIEW_MEMORY_MB !== undefined
-            ? { memoryMb: Number.parseInt(process.env.AI_REVIEW_MEMORY_MB, 10) }
-            : {}),
-        })
-  return {
-    run: (input) => (input.harness === "claude" ? claude.run(input) : opencode.run(input)),
-  }
+  const softOpencode = createOpencodeRunner({
+    model: env.aiReviewModel,
+    timeoutMs: env.aiReviewTimeoutMs,
+    log: log.child({ component: "ai-review", sandbox: "soft" }),
+  })
+  const msbOpencode = createMsbWrappedRunner({
+    model: env.aiReviewModel,
+    timeoutMs: env.aiReviewTimeoutMs,
+    log: log.child({ component: "ai-review", sandbox: "msb" }),
+    ...(process.env.AI_REVIEW_IMAGE !== undefined ? { image: process.env.AI_REVIEW_IMAGE } : {}),
+    ...(process.env.AI_REVIEW_SNAPSHOT !== undefined
+      ? { msbSnapshot: process.env.AI_REVIEW_SNAPSHOT }
+      : {}),
+    ...(process.env.AI_REVIEW_MEMORY_MB !== undefined
+      ? { memoryMb: Number.parseInt(process.env.AI_REVIEW_MEMORY_MB, 10) }
+      : {}),
+  })
+  return dispatchAiReviewRunner({
+    claude,
+    softOpencode,
+    msbOpencode,
+    useSoftOpencode: process.env.AI_REVIEW_HARDEN === "0",
+  })
 }
 
 export const buildApp = (db: Db, env: Env, deps: Deps = {}) => {
@@ -103,6 +120,7 @@ export const buildApp = (db: Db, env: Env, deps: Deps = {}) => {
     .route("/api/auth", authRoutes({ db, env, githubClient, pairingStore }))
     .route("/api/ingest", ingestRoutes({ db, env }))
     .route("/api/artifacts", artifactRoutes({ db, env }))
+    .route("/api/code-states", codeStateRoutes({ db, env }))
     .route("/api/orgs", orgsRoutes({ db, env }))
     .route("/api/projects", projectsRoutes({ db, env }))
     .route("/api/sessions", sessionsRoutes({ db, env }))

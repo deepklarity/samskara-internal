@@ -1,10 +1,12 @@
 import type { ProjectIdentity } from "@samskara/core"
+import { captureGitCodeState } from "@samskara/core"
 import { beforeEach, describe, expect, test, vi } from "vitest"
 import { readToken } from "../config/credentials.js"
 import { reviveWatcher, watcherPid } from "../config/daemon.js"
 import { isProjectEnabled } from "../config/projects.js"
 import { scopeMismatch } from "../config/server-scope.js"
 import { checkToken } from "../login.js"
+import { readStartCodeState, spoolStartCodeState } from "../watcher/code-state-spool.js"
 import { resolveProject } from "../watcher/resolveProject.js"
 import { ensureCommand } from "./ensure.js"
 
@@ -17,6 +19,14 @@ vi.mock("../config/server-scope.js", () => ({
 }))
 vi.mock("../watcher/resolveProject.js", () => ({ resolveProject: vi.fn() }))
 vi.mock("../login.js", () => ({ checkToken: vi.fn() }))
+vi.mock("@samskara/core", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  captureGitCodeState: vi.fn(),
+}))
+vi.mock("../watcher/code-state-spool.js", () => ({
+  readStartCodeState: vi.fn(),
+  spoolStartCodeState: vi.fn(),
+}))
 
 const project: ProjectIdentity = { name: "widget", slug: "acme-widget" }
 
@@ -41,9 +51,45 @@ beforeEach(() => {
   vi.mocked(isProjectEnabled).mockResolvedValue(true)
   vi.mocked(checkToken).mockResolvedValue("ok")
   vi.mocked(scopeMismatch).mockResolvedValue([])
+  vi.mocked(captureGitCodeState).mockResolvedValue({ sessionId: "s1", phase: "start" } as never)
+  vi.mocked(spoolStartCodeState).mockResolvedValue()
+  vi.mocked(readStartCodeState).mockResolvedValue(null)
 })
 
 describe("ensure command", () => {
+  test("captures the hook cwd and session id before reviving the watcher", async () => {
+    vi.mocked(watcherPid).mockReturnValueOnce(null).mockReturnValue(321)
+    await ensureCommand({
+      hookInput: { sessionId: "s1", cwd: "/work/hook", source: "startup" },
+      ...output().writers,
+    })
+    expect(resolveProject).toHaveBeenCalledWith("/work/hook")
+    expect(captureGitCodeState).toHaveBeenCalledWith("/work/hook", "start", "s1")
+    expect(spoolStartCodeState).toHaveBeenCalledOnce()
+    expect(vi.mocked(spoolStartCodeState).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(reviveWatcher).mock.invocationCallOrder[0] as number,
+    )
+  })
+
+  test("a code capture failure leaves SessionStart successful", async () => {
+    vi.mocked(captureGitCodeState).mockRejectedValueOnce(new Error("cannot read index"))
+    const streams = output()
+    expect(
+      await ensureCommand({
+        hookInput: { sessionId: "s1", cwd: "/repo", source: "startup" },
+        ...streams.writers,
+      }),
+    ).toBe(0)
+    expect(streams.stderr.join("")).toContain("cannot read index")
+  })
+
+  test("a resumed hook does not recapture and replace its first snapshot", async () => {
+    expect(
+      await ensureCommand({ hookInput: { sessionId: "s1", cwd: "/repo", source: "resume" } }),
+    ).toBe(0)
+    expect(captureGitCodeState).not.toHaveBeenCalled()
+    expect(spoolStartCodeState).not.toHaveBeenCalled()
+  })
   test("REQ-021: missing credentials emit login guidance without starting a watcher", async () => {
     const streams = output()
     vi.mocked(readToken).mockResolvedValue(null)

@@ -11,7 +11,13 @@ import {
 } from "@samskara/core"
 import type pino from "pino"
 import { readToken } from "../config/credentials.js"
-import { artifactQueuePath, artifactStatePath, statePath } from "../config/paths.js"
+import {
+  artifactQueuePath,
+  artifactStatePath,
+  endCodeStateSpoolDir,
+  startCodeStateSpoolDir,
+  statePath,
+} from "../config/paths.js"
 import { getProject, isProjectEnabled, syncFromFor } from "../config/projects.js"
 import { ALL_SCOPED_PATHS, mismatchFact, scopeMismatch } from "../config/server-scope.js"
 import { parseConfig } from "../config.js"
@@ -19,7 +25,12 @@ import { sleep } from "../io.js"
 import { runArtifactWorkers } from "./artifact-worker.js"
 import { runCycle, type WatcherConfig, type WatcherDeps } from "./driver.js"
 import { resolveProject } from "./resolveProject.js"
-import { createArtifactSink, createHttpSink } from "./sink.js"
+import {
+  createArtifactSink,
+  createEndCodeStateSink,
+  createHttpSink,
+  createStartCodeStateSink,
+} from "./sink.js"
 
 const CYCLE_MS = 10_000
 const SHUTDOWN_GRACE_MS = 5_000
@@ -41,7 +52,10 @@ const activePlugins = async (
     register(opencode)
     return [claude, opencode]
   } catch (err) {
-    log.debug({ err }, "opencode plugin disabled: database unreachable")
+    log.warn(
+      { err },
+      "opencode plugin disabled: its database could not be opened, so opencode sessions will not sync",
+    )
     return [claude]
   }
 }
@@ -141,6 +155,8 @@ export const watch = async (options: WatchOptions): Promise<void> => {
   const config: WatcherConfig = {
     statePath: statePath(),
     artifactQueuePath: artifactQueuePath(),
+    startCodeStateSpoolDir: startCodeStateSpoolDir(),
+    endCodeStateSpoolDir: endCodeStateSpoolDir(),
     messageCap: resolved.messageCap,
     sessionConcurrency: resolved.sessionConcurrency,
   }
@@ -148,6 +164,16 @@ export const watch = async (options: WatchOptions): Promise<void> => {
     fs: nodeFs,
     clock: { now: () => Date.now() },
     sink: createHttpSink({ apiBase: resolved.apiUrl, readToken, fetch: globalThis.fetch }),
+    startCodeStateSink: createStartCodeStateSink({
+      apiBase: resolved.apiUrl,
+      readToken,
+      fetch: globalThis.fetch,
+    }),
+    endCodeStateSink: createEndCodeStateSink({
+      apiBase: resolved.apiUrl,
+      readToken,
+      fetch: globalThis.fetch,
+    }),
     glob: (pattern) => globAll(pattern, log),
     plugins: await activePlugins(log),
     resolveProject: projectOverride

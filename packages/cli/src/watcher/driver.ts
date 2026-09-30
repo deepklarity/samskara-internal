@@ -3,6 +3,7 @@ import type {
   Checkpoint,
   CheckpointBody,
   CheckpointStore,
+  CodeStateSnapshot,
   CollectDeps,
   FileSystem,
   GitEvent,
@@ -18,6 +19,7 @@ import { mapWithLimit } from "../concurrency.js"
 import { persistedApiUrl } from "../config/server-scope.js"
 import { collectArtifacts } from "./artifact-extract.js"
 import { type ArtifactQueueEntry, enqueue } from "./artifact-queue.js"
+import { drainEndCodeStates, drainStartCodeStates, readStartCodeState } from "./code-state-spool.js"
 import { shouldCaptureArtifacts } from "./containment.js"
 import { collectGitEvents } from "./gitEvents.js"
 import { createRepoResolver, resolveHeadSha } from "./resolveRepo.js"
@@ -29,6 +31,8 @@ export type WatcherConfig = {
   readonly statePath: string
   /** Absent means the cycle does no artifact work at all. */
   readonly artifactQueuePath?: string
+  readonly startCodeStateSpoolDir?: string
+  readonly endCodeStateSpoolDir?: string
   /** Both resolved once at startup by `parseConfig`, so a cycle never re-reads the environment. */
   readonly messageCap: number
   readonly sessionConcurrency: number
@@ -38,6 +42,8 @@ export type WatcherDeps = {
   readonly fs: FileSystem
   readonly clock: Clock
   readonly sink: { send(payload: IngestPayload): Promise<SinkResult> }
+  readonly startCodeStateSink?: { send(payload: CodeStateSnapshot): Promise<SinkResult> }
+  readonly endCodeStateSink?: { send(payload: CodeStateSnapshot): Promise<SinkResult> }
   readonly glob: (pattern: string) => Promise<ReadonlyArray<string>>
   /**
    * Every registered plugin runs each cycle. The watcher was written for one plugin at a time
@@ -236,9 +242,17 @@ const syncTrack = async (
  * after the fact, so by a later cycle HEAD has moved to whatever the session has since committed.
  * A track already in the checkpoint store has been sent before, so its origin is already stored.
  */
-const originFor = async (track: SessionTrack, prev: CheckpointStore): Promise<SessionOrigin> => {
+const originFor = async (
+  track: SessionTrack,
+  prev: CheckpointStore,
+  spoolDir?: string,
+): Promise<SessionOrigin> => {
   if (track.type !== "main") return {}
   if (prev.checkpoints[track.checkpointKey]) return {}
+  if (spoolDir) {
+    const snapshot = await readStartCodeState(spoolDir, track.sessionId).catch(() => null)
+    if (snapshot) return { startCwd: snapshot.cwd, startCommit: snapshot.headSha }
+  }
   const startCwd = track.records
     .flatMap((record) => record.messages)
     .find((message) => message.cwd !== undefined)?.cwd
@@ -252,10 +266,16 @@ const syncSession = async (
   prev: CheckpointStore,
   deps: WatcherDeps,
   messageCap: number,
+  spoolDir?: string,
 ): Promise<Record<string, Checkpoint>> => {
   const updated: Record<string, Checkpoint> = {}
   for (const track of batch.tracks) {
-    const checkpoint = await syncTrack(track, await originFor(track, prev), deps, messageCap)
+    const checkpoint = await syncTrack(
+      track,
+      await originFor(track, prev, spoolDir),
+      deps,
+      messageCap,
+    )
     if (checkpoint) updated[track.checkpointKey] = checkpoint
   }
   return updated
@@ -354,8 +374,23 @@ export const runCycle = async (
   )
   const batches = batchLists.flat()
   const results = await mapWithLimit(batches, config.sessionConcurrency, (batch) =>
-    syncSession(batch, prev, deps, config.messageCap),
+    syncSession(batch, prev, deps, config.messageCap, config.startCodeStateSpoolDir),
   )
+
+  // Session rows now exist for successful ingests. A failed upload remains on disk and is retried
+  // on later cycles, including cycles with no new transcript messages.
+  if (config.startCodeStateSpoolDir && deps.startCodeStateSink) {
+    await drainStartCodeStates(
+      config.startCodeStateSpoolDir,
+      deps.startCodeStateSink,
+      deps.log,
+    ).catch((err: unknown) => deps.log.warn({ err }, "start code state spool drain failed"))
+  }
+  if (config.endCodeStateSpoolDir && deps.endCodeStateSink) {
+    await drainEndCodeStates(config.endCodeStateSpoolDir, deps.endCodeStateSink, deps.log).catch(
+      (err: unknown) => deps.log.warn({ err }, "end code state spool drain failed"),
+    )
+  }
 
   // After the flush, before the checkpoint write: enqueuing earlier would queue artifacts for
   // records that never reached the server, and the worker would 409 on every one.

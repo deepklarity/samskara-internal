@@ -23,6 +23,7 @@ export const fetchSessionLearnings = (
 
 /** A per-run reviewer choice from the modal; empty fields keep the server's env defaults. */
 export type ReviewerChoice = {
+  readonly analyzer?: "ai-v1" | "ai-v2"
   readonly harness?: "opencode" | "claude"
   readonly model?: string
   /** Replace an existing review instead of 409-ing — the Redo path. */

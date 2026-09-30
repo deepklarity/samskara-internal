@@ -1,8 +1,14 @@
+import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { mkdtemp as realMkdtemp, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { NormalizedMessage, ReviewCounts, SessionExport } from "@samskara/core"
-import { buildSessionExport, reviewContractMd, reviewXmlTemplate } from "@samskara/core"
+import {
+  buildSessionExport,
+  captureGitCodeState,
+  reviewContractMd,
+  reviewXmlTemplate,
+} from "@samskara/core"
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql"
 import Database from "better-sqlite3"
 import { eq } from "drizzle-orm"
@@ -26,8 +32,14 @@ import {
   throwawayOnLocalServer,
 } from "../../lib/test-db.js"
 import { captureLogger } from "../../lib/test-logger.js"
+import {
+  getStartCodeState,
+  listReviewCodeStates,
+  saveEndCodeState,
+  saveStartCodeState,
+} from "../../repositories/code-states.repo.js"
 import { type AiReviewDeps, runAiReview } from "./pipeline.js"
-import type { HarnessRunner } from "./runner.js"
+import { type HarnessRunner, HarnessRunnerError } from "./runner.js"
 
 const env: Env = {
   githubClientId: "id",
@@ -325,6 +337,7 @@ const stdoutWith = (payload: FixturePayload): string =>
 type CapturedRun = {
   prompt: string
   workspaceDir: string
+  codeDir?: string
   sessionJson: unknown
   /** review.xml as the harness found it — the template the pipeline staged pre-run. */
   templateXml: string
@@ -443,7 +456,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
   ): { runner: HarnessRunner; runs: CapturedRun[] } => {
     const runs: CapturedRun[] = []
     const runner: HarnessRunner = {
-      run: async ({ prompt, workspaceDir }) => {
+      run: async ({ prompt, workspaceDir, codeDir }) => {
         const sessionJson = JSON.parse(
           readFileSync(`${workspaceDir}/session.json`, "utf8"),
         ) as unknown
@@ -451,7 +464,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
         // have staged the pre-written template beside the export.
         const templateXml = readFileSync(join(workspaceDir, "review.xml"), "utf8")
         const contractMd = readFileSync(join(workspaceDir, "CONTRACT.md"), "utf8")
-        const captured = { prompt, workspaceDir, sessionJson, templateXml, contractMd }
+        const captured = { prompt, workspaceDir, codeDir, sessionJson, templateXml, contractMd }
         runs.push(captured)
         const behaviour = respond(captured)
         if (behaviour.removeFile === true) {
@@ -540,6 +553,98 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     // Workspace cleaned up: the mkdtemp dir existed during the run and is gone after.
     expect(createdDirs).toHaveLength(1)
     expect(existsSync(createdDirs[0] as string)).toBe(false)
+  })
+
+  test("ai-v2 stages a separate historical evidence mount and preserves ai-v1", async () => {
+    await db.insert(sessionReviews).values({
+      sessionId,
+      projectId,
+      analyzer: "ai-v1",
+      outcome: "productive",
+      friction: "none",
+      summary: "earlier transcript-only review",
+      signals: {},
+    })
+    const v2Xml = xmlOf(validPayload(sessionExport.index))
+      .replace("  <counts ", "  <improvements></improvements>\n  <counts ")
+      .replace('breadcrumbs="1"/>', 'breadcrumbs="1" improvements="0"/>')
+    let manifest: { tree?: { available?: boolean } } | undefined
+    const { runner, runs } = fakeRunner((captured) => {
+      expect(captured.codeDir).toBeDefined()
+      expect(captured.codeDir).not.toContain(captured.workspaceDir)
+      const reviewerConfig = JSON.parse(
+        readFileSync(join(captured.workspaceDir, "opencode.json"), "utf8"),
+      ) as { permission: string }
+      expect(reviewerConfig.permission).toBe("allow")
+      manifest = JSON.parse(
+        readFileSync(join(captured.codeDir as string, "evidence-manifest.json"), "utf8"),
+      ) as typeof manifest
+      return { stdout: "review.xml ready", file: v2Xml }
+    })
+
+    const result = await runAiReview(depsWith(runner), userId, sessionId, { analyzer: "ai-v2" })
+
+    expect(result.kind).toBe("ok")
+    expect(runs[0]?.prompt).toContain("/code/tree")
+    expect(runs[0]?.contractMd).toContain("not a generic code-review pass")
+    expect(manifest?.tree?.available).toBe(false)
+    const rows = await db
+      .select()
+      .from(sessionReviews)
+      .where(eq(sessionReviews.sessionId, sessionId))
+    expect(rows.map((row) => row.analyzer).sort()).toEqual(["ai-v1", "ai-v2"])
+  })
+
+  test("ai-v2 uses persisted hook start/end states and freezes a review-time state", async () => {
+    const repo = await realMkdtemp(join("/tmp", "samskara-review-state-test-"))
+    const git = (...args: string[]) =>
+      execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim()
+    try {
+      git("init", "-q")
+      git("config", "user.email", "review@example.test")
+      git("config", "user.name", "Reviewer")
+      await writeFile(join(repo, "code.ts"), "committed\n")
+      git("add", "code.ts")
+      git("commit", "-qm", "before session")
+      const sha = git("rev-parse", "HEAD")
+      await writeFile(join(repo, "code.ts"), "dirty before session\n")
+      const startState = await captureGitCodeState(repo, "start", sessionId)
+      await db
+        .update(sessions)
+        .set({ cwd: repo, startCommit: sha })
+        .where(eq(sessions.id, sessionId))
+      await saveStartCodeState(db, startState)
+      await writeFile(join(repo, "code.ts"), "changed during session\n")
+      const endState = await captureGitCodeState(repo, "end", sessionId)
+      await saveEndCodeState(db, endState)
+      await writeFile(join(repo, "code.ts"), "unrelated later change\n")
+
+      const v2Xml = xmlOf(validPayload(sessionExport.index))
+        .replace("  <counts ", "  <improvements></improvements>\n  <counts ")
+        .replace('breadcrumbs="1"/>', 'breadcrumbs="1" improvements="0"/>')
+      const { runner } = fakeRunner((captured) => {
+        const codeDir = captured.codeDir as string
+        expect(readFileSync(join(codeDir, "tree", "code.ts"), "utf8")).toBe(
+          "dirty before session\n",
+        )
+        expect(readFileSync(join(codeDir, "after", "tree", "code.ts"), "utf8")).toBe(
+          "changed during session\n",
+        )
+        const manifest = JSON.parse(
+          readFileSync(join(codeDir, "evidence-manifest.json"), "utf8"),
+        ) as { states?: { afterSource?: string } }
+        expect(manifest.states?.afterSource).toBe("session-end")
+        return { stdout: "review.xml ready", file: v2Xml }
+      })
+      const result = await runAiReview(depsWith(runner), userId, sessionId, { analyzer: "ai-v2" })
+      expect(result.kind).toBe("ok")
+      expect((await getStartCodeState(db, sessionId))?.captureId).toBe(startState.captureId)
+      const capturedReviews = await listReviewCodeStates(db, sessionId)
+      expect(capturedReviews).toHaveLength(1)
+      expect(capturedReviews[0]?.phase).toBe("review")
+    } finally {
+      await rm(repo, { recursive: true, force: true })
+    }
   })
 
   test("P1b: the workspace stages the exact core template and contract beside session.json before the harness runs", async () => {
@@ -739,6 +844,72 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     expect(existsSync(createdDirs[0] as string)).toBe(false)
   })
 
+  test("P5: a failed MSB run retains its reviewer trace in review diagnostics", async () => {
+    const { runner } = fakeRunner(() => {
+      throw new HarnessRunnerError("msb run exited with code 1", {
+        stderr: "guest failed",
+        agentLog: "$ cat session.json\n$ write review.xml",
+        logPath: "/sandbox/exec.log",
+      })
+    })
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result).toMatchObject({
+      kind: "error",
+      code: "harnessFailed",
+      detail: {
+        message: "msb run exited with code 1",
+        stderr: "guest failed",
+        agentLog: "$ cat session.json\n$ write review.xml",
+        logPath: "/sandbox/exec.log",
+      },
+    })
+  })
+
+  test("P5b: a completed review survives an MSB exit failure after the file was written", async () => {
+    const runner: HarnessRunner = {
+      run: async ({ workspaceDir }) => {
+        await writeFile(join(workspaceDir, "review.xml"), xmlOf(validPayload(sessionExport.index)))
+        throw new HarnessRunnerError("msb run exited with code 1", {
+          stderr: "guest shutdown returned code 1",
+        })
+      },
+    }
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result.kind).toBe("ok")
+    expect(await db.select().from(sessionReviews)).toHaveLength(1)
+  })
+
+  test("P5c: an incomplete review does not survive an MSB exit failure", async () => {
+    const runner: HarnessRunner = {
+      run: async ({ workspaceDir }) => {
+        await writeFile(join(workspaceDir, "review.xml"), "<review><summary>unfinished</summary>")
+        throw new HarnessRunnerError("msb run exited with code 1")
+      },
+    }
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result).toMatchObject({ kind: "error", code: "harnessFailed" })
+    expect(await db.select().from(sessionReviews)).toHaveLength(0)
+  })
+
+  test("P5d: a completed code-aware review survives an MSB exit failure", async () => {
+    const v2Xml = xmlOf(validPayload(sessionExport.index))
+      .replace("  <counts ", "  <improvements></improvements>\n  <counts ")
+      .replace('breadcrumbs="1"/>', 'breadcrumbs="1" improvements="0"/>')
+    const runner: HarnessRunner = {
+      run: async ({ workspaceDir }) => {
+        await writeFile(join(workspaceDir, "review.xml"), v2Xml)
+        throw new HarnessRunnerError("msb run exited with code 1")
+      },
+    }
+    const result = await runAiReview(depsWith(runner), userId, sessionId, { analyzer: "ai-v2" })
+    expect(result).toMatchObject({ kind: "ok", payload: { analyzer: "ai-v2" } })
+    const rows = await db.select().from(sessionReviews)
+    expect(rows).toMatchObject([{ analyzer: "ai-v2" }])
+    expect(rows[0]?.signals).toMatchObject({
+      run: { harnessExitWarning: "msb run exited with code 1" },
+    })
+  })
+
   test("P6: deliverable present but with no recoverable XML -> unparseable with the parser's error and source excerpt", async () => {
     const file = "I could not read session.json, sorry."
     const { runner } = fakeRunner(() => ({ stdout: "review.xml ready", file }))
@@ -829,6 +1000,19 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
       .from(sessionReviews)
       .where(eq(sessionReviews.sessionId, sessionId))
     expect(rows).toHaveLength(0)
+  })
+
+  test("a code-aware reviewer that leaves the template untouched reports its denied code read", async () => {
+    const { runner } = fakeRunner(() => ({
+      stdout: "Review stopped.",
+      agentLog: "permission requested: external_directory (/code/*); auto-rejecting",
+    }))
+    const result = await runAiReview(depsWith(runner), userId, sessionId, { analyzer: "ai-v2" })
+    expect(result).toMatchObject({
+      kind: "error",
+      code: "deliverableMissing",
+      detail: { message: "Reviewer could not read /code because OpenCode rejected permission." },
+    })
   })
 
   test("P11: claimed counts that disagree with what parsed persist as partial — no hard fail", async () => {

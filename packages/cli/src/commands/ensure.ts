@@ -1,16 +1,20 @@
+import { captureGitCodeState } from "@samskara/core"
 import { readToken } from "../config/credentials.js"
 import { reviveWatcher, watcherPid } from "../config/daemon.js"
-import { watchLogDir } from "../config/paths.js"
+import { startCodeStateSpoolDir, watchLogDir } from "../config/paths.js"
 import { isProjectEnabled } from "../config/projects.js"
 import { scopeMismatch, TRIPWIRE_PATHS } from "../config/server-scope.js"
 import { errorMessage, resolveIo, type Writer } from "../io.js"
 import { checkToken } from "../login.js"
+import { readStartCodeState, spoolStartCodeState } from "../watcher/code-state-spool.js"
 import { resolveProject } from "../watcher/resolveProject.js"
+import type { SessionStartInput } from "./hook-input.js"
 
 export type EnsureOptions = {
   readonly cwd?: string
   readonly stdout?: Writer
   readonly stderr?: Writer
+  readonly hookInput?: SessionStartInput | null
 }
 
 const emitContext = (stdout: Writer, lines: ReadonlyArray<string>): void => {
@@ -44,17 +48,8 @@ export const ensureCommand = async (options: EnsureOptions = {}): Promise<number
           `is configured for ${mismatch.current}. Tell the user to run \`samskara init --force\`.`,
       )
     }
-    // `watch()` throws on a mismatch, so reviving here would spawn a process guaranteed to die.
-    if (mismatch === undefined && watcherPid() === null) {
-      await reviveWatcher()
-      if (watcherPid() === null) {
-        context.push(
-          `Samskara capture may be OFF because the watcher did not stay running. Tell the user to check ${watchLogDir()}.`,
-        )
-      }
-    }
-
-    const project = await resolveProject(options.cwd ?? process.cwd())
+    const cwd = options.hookInput?.cwd ?? options.cwd ?? process.cwd()
+    const project = await resolveProject(cwd)
     if (project === null || !(await isProjectEnabled(project.slug))) {
       context.push(
         project === null
@@ -64,6 +59,36 @@ export const ensureCommand = async (options: EnsureOptions = {}): Promise<number
       // A disabled project uploads nothing, so a server round trip would only add startup latency.
       emitContext(stdout, context)
       return 0
+    }
+
+    // Capture before the watcher starts and before the agent's first action. Errors are isolated
+    // because a code snapshot must never prevent the host session from starting.
+    if (
+      options.hookInput &&
+      mismatch === undefined &&
+      ["startup", "clear", "fork"].includes(options.hookInput.source ?? "")
+    ) {
+      try {
+        const dir = startCodeStateSpoolDir()
+        if (!(await readStartCodeState(dir, options.hookInput.sessionId))) {
+          await spoolStartCodeState(
+            dir,
+            await captureGitCodeState(cwd, "start", options.hookInput.sessionId),
+          )
+        }
+      } catch (error) {
+        stderr.write(`samskara start code state: ${errorMessage(error)}\n`)
+      }
+    }
+
+    // `watch()` throws on a mismatch, so reviving here would spawn a process guaranteed to die.
+    if (mismatch === undefined && watcherPid() === null) {
+      await reviveWatcher()
+      if (watcherPid() === null) {
+        context.push(
+          `Samskara capture may be OFF because the watcher did not stay running. Tell the user to check ${watchLogDir()}.`,
+        )
+      }
     }
 
     // An enabled project is about to upload, so a token the server no longer accepts is a real

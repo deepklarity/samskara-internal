@@ -7,16 +7,23 @@ import { profile } from "../config/paths.js"
 import { reportError, resolveIo, type Writer } from "../io.js"
 
 const hookCommandSchema = z
-  .object({ type: z.string().optional(), command: z.string().optional() })
+  .object({
+    type: z.string().optional(),
+    command: z.string().optional(),
+    timeout: z.number().optional(),
+  })
   .passthrough()
 const hookMatcherSchema = z
   .object({ matcher: z.string().optional(), hooks: z.array(hookCommandSchema) })
   .passthrough()
 const recordSchema = z.record(z.string(), z.unknown())
-const markerBase = "samskara:ensure"
+type Event = "SessionStart" | "SessionEnd"
+const markerBase = (event: Event): string =>
+  event === "SessionStart" ? "samskara:ensure" : "samskara:capture-end"
 
 /** One marker per profile, so a dev install and a release install manage separate hook lines. */
-const marker = (): string => (profile() === "default" ? markerBase : `${markerBase}:${profile()}`)
+const marker = (event: Event): string =>
+  profile() === "default" ? markerBase(event) : `${markerBase(event)}:${profile()}`
 
 type Hook = z.infer<typeof hookCommandSchema>
 type Matcher = z.infer<typeof hookMatcherSchema>
@@ -59,37 +66,57 @@ const writeSettings = (path: string, settings: JsonRecord): void => {
  * Claude Code runs this command with its own environment, never the shell that installed it, so a
  * non-default profile has to travel inside the command itself.
  */
-const managedCommand = (): string => {
+const managedCommand = (event: Event): string => {
   const prefix = profile() === "default" ? "" : `SAMSKARA_PROFILE=${profile()} `
-  return `${prefix}${JSON.stringify(process.execPath)} ${JSON.stringify(resolveCliEntry())} ensure # ${marker()}`
+  const command = event === "SessionStart" ? "ensure" : "capture-end"
+  return `${prefix}${JSON.stringify(process.execPath)} ${JSON.stringify(resolveCliEntry())} ${command} # ${marker(event)}`
 }
 
 // Anchored, not `includes`: `samskara:ensure` is a prefix of `samskara:ensure:dev`, so a substring
 // match would let the default profile adopt every other profile's hook and overwrite it as stale.
-const isManaged = (hook: Hook): hook is Hook & { command: string } =>
-  hook.command?.endsWith(`# ${marker()}`) === true
+const isManaged = (hook: Hook, event: Event): hook is Hook & { command: string } =>
+  hook.command?.endsWith(`# ${marker(event)}`) === true
 
-const statusOf = (matchers: ReadonlyArray<Matcher>, want: string): Status => {
-  const found = matchers.flatMap((matcher) => matcher.hooks.filter(isManaged))
+const statusOf = (matchers: ReadonlyArray<Matcher>, event: Event): Status => {
+  const found = matchers.flatMap((matcher) =>
+    matcher.hooks.filter((hook) => isManaged(hook, event)),
+  )
   if (found.length === 0) return "missing"
-  return found.every((hook) => hook.command === want) ? "current" : "stale"
+  const want = managedCommand(event)
+  return found.every(
+    (hook) => hook.command === want && (event !== "SessionEnd" || hook.timeout === 15),
+  )
+    ? "current"
+    : "stale"
 }
 
-const withCommand = (matchers: ReadonlyArray<Matcher>, command: string): ReadonlyArray<Matcher> =>
+const withCommand = (matchers: ReadonlyArray<Matcher>, event: Event): ReadonlyArray<Matcher> =>
   matchers.map((matcher) => ({
     ...matcher,
-    hooks: matcher.hooks.map((hook) => (isManaged(hook) ? { ...hook, command } : hook)),
+    hooks: matcher.hooks.map((hook) =>
+      isManaged(hook, event)
+        ? {
+            ...hook,
+            command: managedCommand(event),
+            ...(event === "SessionEnd" ? { timeout: 15 } : {}),
+          }
+        : hook,
+    ),
   }))
 
-const withoutManaged = (matchers: ReadonlyArray<Matcher>): ReadonlyArray<Matcher> =>
+const withoutManaged = (matchers: ReadonlyArray<Matcher>, event: Event): ReadonlyArray<Matcher> =>
   matchers
-    .map((matcher) => ({ ...matcher, hooks: matcher.hooks.filter((hook) => !isManaged(hook)) }))
+    .map((matcher) => ({
+      ...matcher,
+      hooks: matcher.hooks.filter((hook) => !isManaged(hook, event)),
+    }))
     .filter((matcher) => matcher.hooks.length > 0)
 
 type Current = {
   readonly settings: JsonRecord
   readonly hooks: JsonRecord
   readonly sessionStart: ReadonlyArray<Matcher>
+  readonly sessionEnd: ReadonlyArray<Matcher>
 }
 
 const readCurrent = (path: string): Current => {
@@ -99,25 +126,35 @@ const readCurrent = (path: string): Current => {
     hooks.SessionStart === undefined
       ? []
       : parseOrThrow(z.array(hookMatcherSchema), hooks.SessionStart, path)
-  return { settings, hooks, sessionStart }
+  const sessionEnd =
+    hooks.SessionEnd === undefined
+      ? []
+      : parseOrThrow(z.array(hookMatcherSchema), hooks.SessionEnd, path)
+  return { settings, hooks, sessionStart, sessionEnd }
 }
 
-const saveSessionStart = (
+const saveHooks = (
   path: string,
   current: Current,
   sessionStart: ReadonlyArray<Matcher>,
+  sessionEnd: ReadonlyArray<Matcher>,
 ): void => {
-  const hooks =
-    sessionStart.length === 0
-      ? Object.fromEntries(Object.entries(current.hooks).filter(([key]) => key !== "SessionStart"))
-      : { ...current.hooks, SessionStart: sessionStart }
+  const hooks = Object.fromEntries(
+    Object.entries(current.hooks).filter(([key]) => key !== "SessionStart" && key !== "SessionEnd"),
+  )
+  if (sessionStart.length > 0) hooks.SessionStart = sessionStart
+  if (sessionEnd.length > 0) hooks.SessionEnd = sessionEnd
   writeSettings(path, { ...current.settings, hooks })
 }
 
 export const isManagedHookInstalled = (options: HookCommandOptions = {}): boolean => {
   try {
     const path = options.settingsPath ?? defaultSettingsPath()
-    return statusOf(readCurrent(path).sessionStart, managedCommand()) !== "missing"
+    const current = readCurrent(path)
+    return (
+      statusOf(current.sessionStart, "SessionStart") !== "missing" &&
+      statusOf(current.sessionEnd, "SessionEnd") !== "missing"
+    )
   } catch {
     return false
   }
@@ -129,22 +166,37 @@ export const installHooksCommand = (options: HookCommandOptions = {}): number =>
 
   try {
     const current = readCurrent(path)
-    const command = managedCommand()
-    const status = statusOf(current.sessionStart, command)
+    const startStatus = statusOf(current.sessionStart, "SessionStart")
+    const endStatus = statusOf(current.sessionEnd, "SessionEnd")
 
-    if (status === "current") {
+    if (startStatus === "current" && endStatus === "current") {
       stdout.write(`hook already installed in ${path}\n`)
       return 0
     }
 
-    saveSessionStart(
+    saveHooks(
       path,
       current,
-      status === "stale"
-        ? withCommand(current.sessionStart, command)
-        : [...current.sessionStart, { hooks: [{ type: "command", command }] }],
+      startStatus === "stale"
+        ? withCommand(current.sessionStart, "SessionStart")
+        : startStatus === "current"
+          ? current.sessionStart
+          : [
+              ...current.sessionStart,
+              { hooks: [{ type: "command", command: managedCommand("SessionStart") }] },
+            ],
+      endStatus === "stale"
+        ? withCommand(current.sessionEnd, "SessionEnd")
+        : endStatus === "current"
+          ? current.sessionEnd
+          : [
+              ...current.sessionEnd,
+              { hooks: [{ type: "command", command: managedCommand("SessionEnd"), timeout: 15 }] },
+            ],
     )
-    stdout.write(`${status === "stale" ? "repaired" : "installed"} SessionStart hook in ${path}\n`)
+    stdout.write(
+      `${startStatus === "stale" || endStatus === "stale" ? "repaired" : "installed"} session hooks in ${path}\n`,
+    )
     return 0
   } catch (error) {
     return reportError(stderr, error)
@@ -161,7 +213,12 @@ export const uninstallHooksCommand = (options: HookCommandOptions = {}): number 
 
   try {
     const current = readCurrent(path)
-    saveSessionStart(path, current, withoutManaged(current.sessionStart))
+    saveHooks(
+      path,
+      current,
+      withoutManaged(current.sessionStart, "SessionStart"),
+      withoutManaged(current.sessionEnd, "SessionEnd"),
+    )
     stdout.write(`removed samskara hook from ${path}\n`)
     return 0
   } catch (error) {

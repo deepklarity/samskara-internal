@@ -10,30 +10,45 @@ import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import {
   type AiReviewPayload,
+  type AiReviewPayloadV2,
   buildReviewPrompt,
+  buildReviewPromptV2,
   buildSessionExport,
+  captureGitCodeState,
   fingerprintOf,
   type GroundingProblem,
   type LearningCategory,
   type NormalizedMessage,
   parseReviewXml,
+  parseReviewXmlV2,
   reviewContractMd,
+  reviewContractMdV2,
   reviewXmlTemplate,
+  reviewXmlTemplateV2,
   sessionIndexFrom,
   validateGrounding,
+  validateGroundingV2,
 } from "@samskara/core"
 import type pino from "pino"
 import type { Db } from "../../db/client.js"
 import type { Env } from "../../lib/env.js"
+import {
+  getLatestEndCodeState,
+  getStartCodeState,
+  saveReviewCodeState,
+} from "../../repositories/code-states.repo.js"
 import { canWrite } from "../../repositories/projects.repo.js"
 import * as reviewsRepo from "../../repositories/reviews.repo.js"
 import { getDetail } from "../../repositories/sessions.repo.js"
 import { capAgentLog } from "./agentlog.js"
+import { validateCodeGroundingV2 } from "./code-grounding.js"
+import { getReviewEvidence, type ReviewEvidenceManifest, stageReviewEvidence } from "./evidence.js"
 import type { HarnessRunner } from "./runner.js"
 import { transcriptFromClaudeConfigDir, transcriptFromOpencodeDataDir } from "./transcript.js"
 
 /** Per-run reviewer choice: absent fields fall back to the env-driven defaults. */
 export type AiReviewOptions = {
+  readonly analyzer?: "ai-v1" | "ai-v2"
   readonly harness?: "opencode" | "claude"
   readonly model?: string
 }
@@ -64,7 +79,11 @@ export type AiReviewErrorCode =
   | "ungrounded"
 
 export type AiReviewResult =
-  | { readonly kind: "ok"; readonly reviewId: string; readonly payload: AiReviewPayload }
+  | {
+      readonly kind: "ok"
+      readonly reviewId: string
+      readonly payload: AiReviewPayload | AiReviewPayloadV2
+    }
   | { readonly kind: "error"; readonly code: AiReviewErrorCode; readonly detail?: unknown }
 
 export type AiReviewRun = typeof runAiReview
@@ -93,10 +112,18 @@ export const runAiReview = async (
   options: AiReviewOptions = {},
 ): Promise<AiReviewResult> => {
   const { db, runner, env, log } = deps
+  const analyzer = options.analyzer ?? "ai-v1"
   const harness = options.harness ?? env.aiReviewHarness
   const model = options.model ?? env.aiReviewModel
   const mkdtemp = deps.mkdtemp ?? defaultMkdtemp
   const now = deps.now ?? (() => new Date())
+  if (analyzer === "ai-v2" && harness !== "opencode") {
+    return {
+      kind: "error",
+      code: "harnessFailed",
+      detail: { message: "ai-v2 read-only code evidence requires the MSB Opencode runner" },
+    }
+  }
   // The milestone ledger: every phase boundary is logged with elapsedMs for the server-log
   // watcher, pushed to this tracker for the persisted run record, and forwarded to the
   // registry's hook for the CLI's progress line.
@@ -138,6 +165,8 @@ export const runAiReview = async (
   })
 
   let workspaceDir: string | undefined
+  let codeDir: string | undefined
+  let evidenceManifest: ReviewEvidenceManifest | undefined
   try {
     // os.tmpdir workspace, never the repo. The pipeline writes the export, the review.xml
     // template, and stages auth.json into xdg-data/opencode/ — both runners read the same
@@ -146,6 +175,66 @@ export const runAiReview = async (
     // path either way.
     workspaceDir = await mkdtemp(join(tmpdir(), "samskara-ai-review-"))
     milestone("workspace_ready")
+    if (analyzer === "ai-v2") {
+      // Keep historical bytes outside /work: MSB mounts this second directory at /code:ro.
+      // The writable workspace still holds reviewer auth, harness state, and review.xml.
+      codeDir = await mkdtemp(join(tmpdir(), "samskara-ai-code-"))
+      const evidence = await getReviewEvidence(db, userId, sessionId)
+      if (evidence === null) return { kind: "error", code: "sessionNotFound" }
+      const startState = await getStartCodeState(db, sessionId)
+      const capturedEnd = await getLatestEndCodeState(db, sessionId, startedAt.toISOString())
+      const latestSessionMessageMs = messages.reduce(
+        (latest, message) =>
+          Math.max(latest, message.timestamp ? Date.parse(message.timestamp) : 0),
+        0,
+      )
+      // A resumed session may have messages after an earlier SessionEnd. In that case the
+      // earlier capture cannot represent its latest state, so use this review's watermark.
+      const endState =
+        capturedEnd && Date.parse(capturedEnd.completedAt) >= latestSessionMessageMs
+          ? capturedEnd
+          : null
+      let reviewState = null
+      if (evidence.origin.cwd) {
+        try {
+          reviewState = await captureGitCodeState(evidence.origin.cwd, "review", sessionId)
+          await saveReviewCodeState(db, reviewState)
+        } catch (error) {
+          log.warn(
+            { sessionId, error: error instanceof Error ? error.message : String(error) },
+            "review-time code state unavailable",
+          )
+        }
+      }
+      // The reviewer sees the same alias in every staged source. Revealing the real id in
+      // the manifest would undo session.json's foreign-session lookup protection.
+      const staged = await stageReviewEvidence(
+        { ...evidence, sessionId: REVIEW_SESSION_ALIAS, startState, endState, reviewState },
+        codeDir,
+      )
+      codeDir = staged.codeDir
+      evidenceManifest = staged.manifest
+      // OpenCode treats /code as outside its /work project. Its headless permission
+      // request is auto-rejected, so approve guest tool calls without prompting.
+      // MSB's /code:ro mount still enforces immutable evidence bytes.
+      await writeFile(
+        join(workspaceDir, "opencode.json"),
+        `${JSON.stringify(
+          {
+            $schema: "https://opencode.ai/config.json",
+            permission: "allow",
+          },
+          null,
+          2,
+        )}\n`,
+      )
+      milestone("code_staged", {
+        files: evidenceManifest.tree.files.length,
+        artifacts: evidenceManifest.artifacts.length,
+        commits: evidenceManifest.commits.length,
+        available: evidenceManifest.tree.available,
+      })
+    }
     await writeFile(
       join(workspaceDir, "session.json"),
       `${JSON.stringify(sessionExport, null, 2)}\n`,
@@ -154,11 +243,15 @@ export const runAiReview = async (
     // The deliverable is a FILE: the pipeline pre-writes the template (core's
     // reviewXmlTemplate, the exact skeleton the contract describes) beside the export, and the
     // agent fills it in incrementally rather than emitting one giant reply.
-    await writeFile(join(workspaceDir, "review.xml"), reviewXmlTemplate())
+    const templateXml = analyzer === "ai-v2" ? reviewXmlTemplateV2() : reviewXmlTemplate()
+    await writeFile(join(workspaceDir, "review.xml"), templateXml)
     milestone("template_staged")
     // The contract lives in the workspace, not the prompt: the agent re-reads any rule on
     // demand instead of spending starting context on the whole spec.
-    await writeFile(join(workspaceDir, "CONTRACT.md"), reviewContractMd())
+    await writeFile(
+      join(workspaceDir, "CONTRACT.md"),
+      analyzer === "ai-v2" ? reviewContractMdV2() : reviewContractMd(),
+    )
     milestone("contract_staged")
     // Best-effort auth staging, one shape per harness: if the host has no credentials yet
     // (first run), the model call fails downstream — same failure either way, the surface
@@ -187,7 +280,7 @@ export const runAiReview = async (
     }
     milestone("auth_staged")
 
-    const prompt = buildReviewPrompt({
+    const promptOptions = {
       sessionMeta: {
         sessionId: REVIEW_SESSION_ALIAS,
         title: sessionExport.meta.title,
@@ -199,14 +292,23 @@ export const runAiReview = async (
           ? {}
           : { endedAt: sessionExport.meta.endedAt }),
       },
-    })
+    }
+    const prompt =
+      analyzer === "ai-v2" ? buildReviewPromptV2(promptOptions) : buildReviewPrompt(promptOptions)
 
     milestone("harness_spawning")
     let stdout: string
     let firstByteMs: number | null = null
     let runnerAgentLog: string | undefined
+    let harnessExitWarning: string | undefined
     try {
-      const run = await runner.run({ prompt, workspaceDir, harness, model })
+      const run = await runner.run({
+        prompt,
+        workspaceDir,
+        harness,
+        model,
+        ...(codeDir === undefined ? {} : { codeDir }),
+      })
       stdout = run.stdout
       firstByteMs = run.firstByteMs
       runnerAgentLog = run.agentLog
@@ -216,9 +318,44 @@ export const runAiReview = async (
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const stderr = (error as { stderr?: string }).stderr
-      log.warn({ sessionId, message, stderr, workspaceDir }, "ai review harness run failed")
-      milestone("harness_failed")
-      return { kind: "error", code: "harnessFailed", detail: { message, stderr, workspaceDir } }
+      const agentLog = (error as { agentLog?: string }).agentLog
+      const logPath = (error as { logPath?: string }).logPath
+      // MSB can return a nonzero status during guest shutdown after the reviewer has
+      // finished writing its file. Accept that file only when the XML is complete, counts
+      // are present, and the full schema parses without recovery. An interrupted draft
+      // still reports the original harness failure.
+      const candidate = await readFile(join(workspaceDir, "review.xml"), "utf8").catch(() => "")
+      const completed =
+        candidate !== templateXml && candidate.trimEnd().endsWith("</review>")
+          ? analyzer === "ai-v2"
+            ? parseReviewXmlV2(candidate)
+            : parseReviewXml(candidate)
+          : null
+      if (
+        completed?.ok === true &&
+        completed.recovered.length === 0 &&
+        completed.selfCounts !== undefined
+      ) {
+        stdout = ""
+        runnerAgentLog = agentLog
+        harnessExitWarning = message
+        log.warn(
+          { sessionId, message, stderr, logPath, workspaceDir },
+          "ai review harness exited after a complete deliverable; continuing validation",
+        )
+        milestone("harness_exit_recovered")
+      } else {
+        log.warn(
+          { sessionId, message, stderr, agentLog, logPath, workspaceDir },
+          "ai review harness run failed",
+        )
+        milestone("harness_failed")
+        return {
+          kind: "error",
+          code: "harnessFailed",
+          detail: { message, stderr, agentLog, logPath, workspaceDir },
+        }
+      }
     }
     if (firstByteMs !== null) {
       log.info(
@@ -249,7 +386,22 @@ export const runAiReview = async (
     const file = await readFile(deliverablePath).catch(() => null)
     let source: string
     let xmlBytes: number
-    if (file !== null && file.byteLength > 0) {
+    if (file !== null && file.toString("utf8") === templateXml && !STDOUT_REVIEW_RE.test(stdout)) {
+      const deniedCodeRead =
+        runnerAgentLog?.includes("permission requested: external_directory") &&
+        runnerAgentLog.includes("auto-rejecting")
+      const message = deniedCodeRead
+        ? "Reviewer could not read /code because OpenCode rejected permission."
+        : "Reviewer left the review.xml template unchanged."
+      const lastMilestone = milestones.at(-1)?.name ?? null
+      milestone("deliverable_missing")
+      return {
+        kind: "error",
+        code: "deliverableMissing",
+        detail: { message, lastMilestone },
+      }
+    }
+    if (file !== null && file.byteLength > 0 && file.toString("utf8") !== templateXml) {
       source = file.toString("utf8")
       xmlBytes = file.byteLength
       milestone("deliverable_read", { bytes: xmlBytes })
@@ -273,7 +425,7 @@ export const runAiReview = async (
     // The model-facing contract is XML: locally repairable, salvageable per entry. The
     // parser heals (balancing, escaping, truncation, dropping malformed entries), runs the
     // zod contract, and reports every repair it made in `recovered`.
-    const parsed = parseReviewXml(source)
+    const parsed = analyzer === "ai-v2" ? parseReviewXmlV2(source) : parseReviewXml(source)
     if (!parsed.ok) {
       log.warn(
         {
@@ -305,9 +457,12 @@ export const runAiReview = async (
       ...parsed.value,
       model,
       harness,
-    } as AiReviewPayload
+    } as AiReviewPayload | AiReviewPayloadV2
 
-    const grounding = validateGrounding(payload, sessionIndexFrom(sessionExport.index))
+    const grounding =
+      analyzer === "ai-v2"
+        ? validateGroundingV2(payload as AiReviewPayloadV2, sessionIndexFrom(sessionExport.index))
+        : validateGrounding(payload as AiReviewPayload, sessionIndexFrom(sessionExport.index))
     if (!grounding.ok) {
       log.warn(
         { sessionId, problems: grounding.problems.slice(0, 10) },
@@ -318,6 +473,17 @@ export const runAiReview = async (
         kind: "error",
         code: "ungrounded",
         detail: { problems: grounding.problems.slice(0, 10) as GroundingProblem[] },
+      }
+    }
+    if (analyzer === "ai-v2" && evidenceManifest !== undefined) {
+      const codeGrounding = validateCodeGroundingV2(payload as AiReviewPayloadV2, evidenceManifest)
+      if (!codeGrounding.ok) {
+        milestone("ungrounded")
+        return {
+          kind: "error",
+          code: "ungrounded",
+          detail: { problems: codeGrounding.problems.slice(0, 10) },
+        }
       }
     }
     milestone("grounded")
@@ -376,6 +542,7 @@ export const runAiReview = async (
       ...(parsed.selfCounts === undefined ? {} : { selfCounts: parsed.selfCounts }),
       xmlBytes,
       agentLog: capAgentLog(runnerAgentLog ?? stdout),
+      ...(harnessExitWarning === undefined ? {} : { harnessExitWarning }),
       ...(reviewerTranscript === null ? {} : { transcript: reviewerTranscript }),
       // seq → the captured message's real id. Evidence citations use export aliases (msg-N);
       // the conversation tab resolves real ids, so the web needs this bridge to build links
@@ -390,7 +557,7 @@ export const runAiReview = async (
     const reviewRow = await reviewsRepo.upsertReview(db, {
       sessionId,
       projectId: detail.session.projectId,
-      analyzer: "ai-v1",
+      analyzer,
       outcome: payload.outcome,
       friction: payload.friction,
       summary: payload.summary,
@@ -398,6 +565,12 @@ export const runAiReview = async (
         model: payload.model,
         harness: payload.harness,
         lenses: persistedLenses,
+        ...(analyzer === "ai-v2"
+          ? {
+              improvements: (payload as AiReviewPayloadV2).improvements,
+              evidence: evidenceManifest,
+            }
+          : {}),
         ...(payload.partial === undefined ? {} : { partial: payload.partial }),
         numbers,
         ...(totalDurationMs === undefined ? {} : { totalDurationMs }),
@@ -416,6 +589,9 @@ export const runAiReview = async (
     if (workspaceDir !== undefined) {
       await rm(workspaceDir, { recursive: true, force: true })
     }
+    if (codeDir !== undefined) {
+      await rm(codeDir, { recursive: true, force: true })
+    }
   }
 }
 
@@ -423,7 +599,7 @@ const persistLearnings = async (
   db: Db,
   projectId: string,
   reviewId: string,
-  payload: AiReviewPayload,
+  payload: Pick<AiReviewPayload, "lenses">,
 ): Promise<void> => {
   for (const lens of payload.lenses) {
     if (lens.lens !== "humanLearnings" && lens.lens !== "agentLearnings") continue

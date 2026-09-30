@@ -1,8 +1,9 @@
-import { spawn } from "node:child_process"
+import { execFile, spawn } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { promisify } from "node:util"
 import type pino from "pino"
 import { agentLogFromExecLog, capAgentLog } from "./agentlog.js"
 
@@ -41,6 +42,8 @@ export type ReviewHarness = "opencode" | "claude"
 export type HarnessRunInput = {
   readonly prompt: string
   readonly workspaceDir: string
+  /** Staged historical evidence. MSB mounts it at /code read-only; soft runners reject it. */
+  readonly codeDir?: string
   /** Per-run harness; a concrete runner ignores values that are not its own. */
   readonly harness?: ReviewHarness
   /** Per-run model override; each runner falls back to its constructed default. */
@@ -56,12 +59,19 @@ const KILL_GRACE_MS = 5_000
 export class HarnessRunnerError extends Error {
   readonly stderr: string | undefined
   readonly timedOut: boolean
+  readonly agentLog: string | undefined
+  readonly logPath: string | undefined
 
-  constructor(message: string, options: { stderr?: string; timedOut?: boolean } = {}) {
+  constructor(
+    message: string,
+    options: { stderr?: string; timedOut?: boolean; agentLog?: string; logPath?: string } = {},
+  ) {
     super(message)
     this.name = "HarnessRunnerError"
     this.stderr = options.stderr
     this.timedOut = options.timedOut ?? false
+    this.agentLog = options.agentLog
+    this.logPath = options.logPath
   }
 }
 
@@ -202,20 +212,22 @@ export const createOpencodeRunner = (opts: {
   /** Overridable command path; tests point this at a fake script instead of real opencode. */
   command?: string
 }): HarnessRunner => ({
-  run: ({ prompt, workspaceDir, model }) =>
-    spawnCollect({
-      command: opts.command ?? "opencode",
-      args: ["run", "--model", model ?? opts.model, prompt],
-      cwd: workspaceDir,
-      env: sandboxEnv(workspaceDir),
-      timeoutMs: opts.timeoutMs,
-      log: opts.log,
-    }).then(({ stdout, firstByteMs }) => ({
-      stdout,
-      exitCode: 0,
-      firstByteMs,
-      agentLog: capAgentLog(stdout),
-    })),
+  run: ({ prompt, workspaceDir, codeDir, model }) =>
+    codeDir !== undefined
+      ? Promise.reject(new HarnessRunnerError("read-only code evidence requires the MSB runner"))
+      : spawnCollect({
+          command: opts.command ?? "opencode",
+          args: ["run", "--model", model ?? opts.model, prompt],
+          cwd: workspaceDir,
+          env: sandboxEnv(workspaceDir),
+          timeoutMs: opts.timeoutMs,
+          log: opts.log,
+        }).then(({ stdout, firstByteMs }) => ({
+          stdout,
+          exitCode: 0,
+          firstByteMs,
+          agentLog: capAgentLog(stdout),
+        })),
 })
 
 /**
@@ -243,28 +255,30 @@ export const createClaudeRunner = (opts: {
    */
   sandboxHome?: boolean
 }): HarnessRunner => ({
-  run: ({ prompt, workspaceDir, model }) =>
-    spawnCollect({
-      command: opts.command ?? "claude",
-      args: [
-        "-p",
-        prompt,
-        "--model",
-        model ?? opts.model,
-        "--output-format",
-        "text",
-        "--dangerously-skip-permissions",
-      ],
-      cwd: workspaceDir,
-      env: opts.sandboxHome === false ? process.env : claudeSandboxEnv(workspaceDir),
-      timeoutMs: opts.timeoutMs,
-      log: opts.log,
-    }).then(({ stdout, firstByteMs }) => ({
-      stdout,
-      exitCode: 0,
-      firstByteMs,
-      agentLog: capAgentLog(stdout),
-    })),
+  run: ({ prompt, workspaceDir, codeDir, model }) =>
+    codeDir !== undefined
+      ? Promise.reject(new HarnessRunnerError("read-only code evidence requires the MSB runner"))
+      : spawnCollect({
+          command: opts.command ?? "claude",
+          args: [
+            "-p",
+            prompt,
+            "--model",
+            model ?? opts.model,
+            "--output-format",
+            "text",
+            "--dangerously-skip-permissions",
+          ],
+          cwd: workspaceDir,
+          env: opts.sandboxHome === false ? process.env : claudeSandboxEnv(workspaceDir),
+          timeoutMs: opts.timeoutMs,
+          log: opts.log,
+        }).then(({ stdout, firstByteMs }) => ({
+          stdout,
+          exitCode: 0,
+          firstByteMs,
+          agentLog: capAgentLog(stdout),
+        })),
 })
 
 // ─── msb-wrapped runner ─────────────────────────────────────────────────────
@@ -278,6 +292,27 @@ const MSB_TIMEOUT_MARGIN_MS = 5_000
 const MSB_DEFAULT_IMAGE = "node:22-slim"
 const MSB_DEFAULT_MEMORY_MB = 2_048
 const MSB_SANDBOX_PREFIX = "samskara-ai-review-"
+const execFileAsync = promisify(execFile)
+
+/** Removing stopped review VMs is best-effort bookkeeping; it must not erase a review result. */
+const removeMsbSandbox = async (
+  command: string,
+  sandboxName: string,
+  log: pino.Logger,
+): Promise<void> => {
+  try {
+    await execFileAsync(command, ["remove", "--force", "--quiet", sandboxName], {
+      timeout: 15_000,
+      maxBuffer: 64 * 1024,
+    })
+    log.info({ sandboxName }, "removed completed ai review sandbox")
+  } catch (error) {
+    log.warn(
+      { sandboxName, error: error instanceof Error ? error.message : String(error) },
+      "could not remove ai review sandbox",
+    )
+  }
+}
 
 export type MsbRunnerOpts = {
   readonly model: string
@@ -301,6 +336,7 @@ export type BuildMsbArgsInput = {
   readonly memoryMb: number
   readonly sandboxName: string
   readonly workspaceDir: string
+  readonly codeDir?: string
   readonly prompt: string
 }
 
@@ -332,6 +368,10 @@ export const buildMsbArgs = (input: BuildMsbArgsInput): string[] => {
     "-w",
     "/work",
   ]
+  // The review deliverable and harness state live in writable /work. Historical code and
+  // session evidence are a separate host directory mounted read-only at /code so neither
+  // the reviewer nor its tools can alter bytes they cite while the run is in progress.
+  if (input.codeDir !== undefined) args.push("-v", `${input.codeDir}:/code:ro`)
   if (input.msbSnapshot !== undefined) {
     args.push("--snapshot", input.msbSnapshot)
   }
@@ -362,10 +402,19 @@ export const buildMsbArgs = (input: BuildMsbArgsInput): string[] => {
       "--",
       "sh",
       "-lc",
-      `npm i -g opencode-ai@${OPENCODE_VERSION} >/dev/null 2>&1 && exec opencode run --model ${input.model} ${shellQuote(input.prompt)} </dev/null`,
+      `npm i -g opencode-ai@${OPENCODE_VERSION} >/dev/null 2>&1 && exec opencode run --auto --model ${input.model} ${shellQuote(input.prompt)} </dev/null`,
     )
   } else {
-    args.push("--", "opencode", "run", "--model", input.model, input.prompt, "</dev/null>")
+    args.push(
+      "--",
+      "opencode",
+      "run",
+      "--auto",
+      "--model",
+      input.model,
+      input.prompt,
+      "</dev/null>",
+    )
   }
   return args
 }
@@ -384,6 +433,22 @@ const shellQuote = (value: string): string => `'${value.replace(/'/g, "'\\''")}'
 export const msbExecLogPath = (sandboxName: string): string =>
   join(homedir(), ".microsandbox", "sandboxes", sandboxName, "logs", "exec.log")
 
+/** Capture diagnostics while the failed sandbox still exists; cleanup removes this file. */
+const readFailedMsbTrace = async (
+  sandboxName: string,
+  stdout: string,
+): Promise<{ agentLog: string; logPath?: string }> => {
+  const logPath = msbExecLogPath(sandboxName)
+  try {
+    const contents = await readFile(logPath, "utf8")
+    // Keep the agent's commands when present. Other failures may produce only stream
+    // records, so retain their bounded tail instead of losing the sole diagnostic trace.
+    return { agentLog: agentLogFromExecLog(contents) || capAgentLog(contents), logPath }
+  } catch {
+    return { agentLog: capAgentLog(stdout) }
+  }
+}
+
 /**
  * Spawns `msb run` with the workspace mounted and XDG redirected into it. The captured
  * stdout/stderr honors the same caps as the in-process runner, so a runaway VM cannot
@@ -391,98 +456,116 @@ export const msbExecLogPath = (sandboxName: string): string =>
  * failure handling stays unchanged.
  */
 export const createMsbWrappedRunner = (opts: MsbRunnerOpts): HarnessRunner => ({
-  run: ({ prompt, workspaceDir, model }) =>
-    new Promise((resolve, reject) => {
-      const sandboxName = `${MSB_SANDBOX_PREFIX}${randomBytes(6).toString("hex")}`
-      const args = buildMsbArgs({
-        model: model ?? opts.model,
-        timeoutMs: opts.timeoutMs,
-        image: opts.image ?? MSB_DEFAULT_IMAGE,
-        msbSnapshot: opts.msbSnapshot,
-        memoryMb: opts.memoryMb ?? MSB_DEFAULT_MEMORY_MB,
-        sandboxName,
-        workspaceDir,
-        prompt,
-      })
-      const command = opts.msbBin ?? "msb"
-      const spawnStartedAt = Date.now()
-      const child = spawn(command, args, {
-        env: { ...process.env },
-        stdio: ["ignore", "pipe", "pipe"],
-      })
+  run: async ({ prompt, workspaceDir, codeDir, model }) => {
+    const sandboxName = `${MSB_SANDBOX_PREFIX}${randomBytes(6).toString("hex")}`
+    const command = opts.msbBin ?? "msb"
+    try {
+      return await new Promise((resolve, reject) => {
+        const args = buildMsbArgs({
+          model: model ?? opts.model,
+          timeoutMs: opts.timeoutMs,
+          image: opts.image ?? MSB_DEFAULT_IMAGE,
+          msbSnapshot: opts.msbSnapshot,
+          memoryMb: opts.memoryMb ?? MSB_DEFAULT_MEMORY_MB,
+          sandboxName,
+          workspaceDir,
+          codeDir,
+          prompt,
+        })
+        const spawnStartedAt = Date.now()
+        const child = spawn(command, args, {
+          env: { ...process.env },
+          stdio: ["ignore", "pipe", "pipe"],
+        })
 
-      let stdout = ""
-      let stdoutBytes = 0
-      let stderr = ""
-      let stderrBytes = 0
-      let firstByteMs: number | null = null
-      let settled = false
+        let stdout = ""
+        let stdoutBytes = 0
+        let stderr = ""
+        let stderrBytes = 0
+        let firstByteMs: number | null = null
+        let settled = false
 
-      const collect =
-        (kind: "stdout" | "stderr") =>
-        (chunk: Buffer): void => {
-          if (firstByteMs === null) firstByteMs = Date.now() - spawnStartedAt
-          const bytes = chunk.byteLength
-          if (kind === "stdout") {
-            if (stdoutBytes < MAX_STDOUT_BYTES) {
-              stdout += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stdoutBytes)
-            }
-            stdoutBytes += bytes
-            return
-          }
-          if (stderrBytes < MAX_STDOUT_BYTES) {
-            stderr += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stderrBytes)
-          }
-          stderrBytes += bytes
-        }
-      child.stdout.on("data", collect("stdout"))
-      child.stderr.on("data", collect("stderr"))
-
-      const finish = (fn: () => void) => {
-        if (settled) return
-        settled = true
-        fn()
-      }
-
-      child.on("error", (err) =>
-        finish(() =>
-          reject(new HarnessRunnerError(`failed to start "${command}": ${err.message}`)),
-        ),
-      )
-
-      child.on("close", (code, signal) => {
-        finish(() => {
-          if (signal === "SIGTERM" || signal === "SIGKILL") {
-            reject(
-              new HarnessRunnerError(`msb run timed out after ${opts.timeoutMs}ms`, {
-                stderr,
-                timedOut: true,
-              }),
-            )
-            return
-          }
-          if (code !== 0) {
-            reject(new HarnessRunnerError(`msb run exited with code ${code ?? "null"}`, { stderr }))
-            return
-          }
-          // The sandbox's exec.log outlives the run on the host — the same file
-          // scripts/ai-review-watch.sh --peek reads — so the agent's command lines are
-          // captured after close. Best-effort: a missing or unreadable log degrades to a
-          // stdout tail rather than failing a successful review.
-          const logPath = msbExecLogPath(sandboxName)
-          readFile(logPath, "utf8")
-            .then((contents) => {
-              const agentLog = agentLogFromExecLog(contents)
-              if (agentLog === "") {
-                resolve({ stdout, exitCode: 0, firstByteMs, agentLog: capAgentLog(stdout) })
-                return
+        const collect =
+          (kind: "stdout" | "stderr") =>
+          (chunk: Buffer): void => {
+            if (firstByteMs === null) firstByteMs = Date.now() - spawnStartedAt
+            const bytes = chunk.byteLength
+            if (kind === "stdout") {
+              if (stdoutBytes < MAX_STDOUT_BYTES) {
+                stdout += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stdoutBytes)
               }
-              resolve({ stdout, exitCode: 0, firstByteMs, agentLog, logPath })
-            })
-            .catch(() => {
-              resolve({ stdout, exitCode: 0, firstByteMs, agentLog: capAgentLog(stdout) })
-            })
+              stdoutBytes += bytes
+              return
+            }
+            if (stderrBytes < MAX_STDOUT_BYTES) {
+              stderr += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stderrBytes)
+            }
+            stderrBytes += bytes
+          }
+        child.stdout.on("data", collect("stdout"))
+        child.stderr.on("data", collect("stderr"))
+
+        const finish = (fn: () => void) => {
+          if (settled) return
+          settled = true
+          fn()
+        }
+
+        child.on("error", (err) =>
+          finish(() =>
+            reject(new HarnessRunnerError(`failed to start "${command}": ${err.message}`)),
+          ),
+        )
+
+        child.on("close", (code, signal) => {
+          finish(() => {
+            if (signal === "SIGTERM" || signal === "SIGKILL") {
+              void (async () => {
+                const trace = await readFailedMsbTrace(sandboxName, stdout)
+                reject(
+                  new HarnessRunnerError(`msb run timed out after ${opts.timeoutMs}ms`, {
+                    stderr,
+                    timedOut: true,
+                    ...trace,
+                  }),
+                )
+              })()
+              return
+            }
+            if (code !== 0) {
+              void (async () => {
+                const trace = await readFailedMsbTrace(sandboxName, stdout)
+                reject(
+                  new HarnessRunnerError(`msb run exited with code ${code ?? "null"}`, {
+                    stderr,
+                    ...trace,
+                  }),
+                )
+              })()
+              return
+            }
+            // The sandbox's exec.log outlives the run on the host — the same file
+            // scripts/ai-review-watch.sh --peek reads — so the agent's command lines are
+            // captured after close. Best-effort: a missing or unreadable log degrades to a
+            // stdout tail rather than failing a successful review.
+            const logPath = msbExecLogPath(sandboxName)
+            readFile(logPath, "utf8")
+              .then((contents) => {
+                const agentLog = agentLogFromExecLog(contents)
+                if (agentLog === "") {
+                  resolve({ stdout, exitCode: 0, firstByteMs, agentLog: capAgentLog(stdout) })
+                  return
+                }
+                resolve({ stdout, exitCode: 0, firstByteMs, agentLog, logPath })
+              })
+              .catch(() => {
+                resolve({ stdout, exitCode: 0, firstByteMs, agentLog: capAgentLog(stdout) })
+              })
+          })
         })
       })
-    }),
+    } finally {
+      await removeMsbSandbox(command, sandboxName, opts.log)
+    }
+  },
 })

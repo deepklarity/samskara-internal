@@ -16,6 +16,7 @@ type Props = {
   readonly open: boolean
   readonly onClose: () => void
   readonly onRun: (choice: ReviewerChoice) => void
+  readonly defaultAnalyzer?: "ai-v1" | "ai-v2"
   readonly restoreFocusTo?: () => HTMLElement | null
 }
 
@@ -25,17 +26,25 @@ type Props = {
  * the server's env configuration; "Custom…" escapes the curated model list for anything
  * else a harness accepts.
  */
-export const AnalyzeDialog = ({ open, onClose, onRun, restoreFocusTo }: Props) => {
+export const AnalyzeDialog = ({
+  open,
+  onClose,
+  onRun,
+  defaultAnalyzer = "ai-v1",
+  restoreFocusTo,
+}: Props) => {
   const [state, setState] = useState<State>({ phase: "loading" })
   const [harness, setHarness] = useState("")
   const [model, setModel] = useState("")
   const [customModel, setCustomModel] = useState("")
+  const [analyzer, setAnalyzer] = useState<"ai-v1" | "ai-v2">(defaultAnalyzer)
   const dialogRef = useFocusTrap<HTMLDialogElement>({
     active: open,
     onEscape: onClose,
     fallbackFocus: restoreFocusTo,
   })
   const harnessId = useId()
+  const analyzerId = useId()
   const modelId = useId()
   const customId = useId()
   const ran = useRef(false)
@@ -44,6 +53,7 @@ export const AnalyzeDialog = ({ open, onClose, onRun, restoreFocusTo }: Props) =
     if (!open) return
     ran.current = false
     setState({ phase: "loading" })
+    setAnalyzer(defaultAnalyzer)
     setCustomModel("")
     fetchReviewerOptions().then((result) => {
       if (ran.current) return
@@ -55,7 +65,9 @@ export const AnalyzeDialog = ({ open, onClose, onRun, restoreFocusTo }: Props) =
       if (!result.ok) return
       const options = result.data
       const wanted =
-        options.harnesses.find((entry) => entry.harness === options.defaultHarness) ??
+        (defaultAnalyzer === "ai-v2"
+          ? options.harnesses.find((entry) => entry.harness === "opencode")
+          : options.harnesses.find((entry) => entry.harness === options.defaultHarness)) ??
         options.harnesses.find((entry) => entry.available)
       if (wanted === undefined) return
       setHarness(wanted.harness)
@@ -63,7 +75,7 @@ export const AnalyzeDialog = ({ open, onClose, onRun, restoreFocusTo }: Props) =
         options.defaultHarness === wanted.harness ? options.defaultModel : wanted.defaultModel,
       )
     })
-  }, [open])
+  }, [open, defaultAnalyzer])
 
   if (!open) return null
 
@@ -71,13 +83,18 @@ export const AnalyzeDialog = ({ open, onClose, onRun, restoreFocusTo }: Props) =
   const harnessOptions = ready?.harnesses ?? []
   const current = harnessOptions.find((entry) => entry.harness === harness)
   const models = current?.models ?? []
-  const usableHarnesses = harnessOptions.filter((entry) => entry.available)
+  const usableHarnesses = harnessOptions.filter(
+    (entry) =>
+      entry.available &&
+      (analyzer === "ai-v1" || (ready?.codeAwareAvailable && entry.harness === "opencode")),
+  )
   const modelIsKnown = model === CUSTOM || models.includes(model)
   const run = (): void => {
     if (ready === null) return
     ran.current = true
     const chosenModel = model === CUSTOM ? customModel.trim() : model === "" ? undefined : model
     onRun({
+      ...(analyzer === "ai-v1" ? {} : { analyzer }),
       harness: harness === "" ? undefined : (harness as "opencode" | "claude"),
       ...(chosenModel === undefined || chosenModel === "" ? {} : { model: chosenModel }),
     })
@@ -112,10 +129,44 @@ export const AnalyzeDialog = ({ open, onClose, onRun, restoreFocusTo }: Props) =
         {ready !== null ? (
           usableHarnesses.length === 0 ? (
             <p role="alert" className="mt-4 border border-err/40 bg-panel p-3 text-err">
-              No reviewer CLI is installed on the server (opencode or claude).
+              {analyzer === "ai-v2"
+                ? "Code-aware review requires opencode on the server."
+                : "No reviewer CLI is installed on the server (opencode or claude)."}
             </p>
           ) : (
             <div className="mt-4 flex flex-col gap-3">
+              <div>
+                <label className={labelClass} htmlFor={analyzerId}>
+                  Analysis type
+                </label>
+                <select
+                  id={analyzerId}
+                  className={`${controlClass} mt-1 cursor-pointer`}
+                  value={analyzer}
+                  onChange={(event) => {
+                    const next = event.target.value as "ai-v1" | "ai-v2"
+                    setAnalyzer(next)
+                    if (next === "ai-v2" && harness !== "opencode") {
+                      const opencode = harnessOptions.find((entry) => entry.harness === "opencode")
+                      setHarness("opencode")
+                      setModel(opencode?.defaultModel ?? "")
+                    }
+                  }}
+                >
+                  <option value="ai-v1">Standard review</option>
+                  <option
+                    value="ai-v2"
+                    disabled={
+                      !ready.codeAwareAvailable ||
+                      !harnessOptions.some(
+                        (entry) => entry.harness === "opencode" && entry.available,
+                      )
+                    }
+                  >
+                    Code-aware review
+                  </option>
+                </select>
+              </div>
               <div>
                 <label className={labelClass} htmlFor={harnessId}>
                   Reviewer harness
@@ -133,7 +184,13 @@ export const AnalyzeDialog = ({ open, onClose, onRun, restoreFocusTo }: Props) =
                   }}
                 >
                   {harnessOptions.map((entry) => (
-                    <option key={entry.harness} value={entry.harness} disabled={!entry.available}>
+                    <option
+                      key={entry.harness}
+                      value={entry.harness}
+                      disabled={
+                        !entry.available || (analyzer === "ai-v2" && entry.harness !== "opencode")
+                      }
+                    >
                       {entry.harness}
                       {entry.available ? "" : " (not installed)"}
                     </option>

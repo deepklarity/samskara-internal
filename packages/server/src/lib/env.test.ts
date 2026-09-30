@@ -26,7 +26,8 @@ describe("loadEnv", () => {
       localLoginLogin: "samskara-dev",
       aiReviewHarness: "opencode",
       aiReviewModel: "zai-coding-plan/glm-5.3-flash",
-      aiReviewTimeoutMs: 600000,
+      aiReviewTimeoutMs: 900000,
+      webDist: undefined,
     })
   })
 
@@ -106,10 +107,10 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ ...complete, GITHUB_CLIENT_ID: "" })).toThrow(/GITHUB_CLIENT_ID/)
   })
 
-  test("defaults AI_REVIEW_MODEL to zai-coding-plan/glm-5.3-flash and AI_REVIEW_TIMEOUT_MS to 600000", () => {
+  test("defaults AI_REVIEW_MODEL to zai-coding-plan/glm-5.3-flash and AI_REVIEW_TIMEOUT_MS to 900000", () => {
     const env = loadEnv(complete)
     expect(env.aiReviewModel).toBe("zai-coding-plan/glm-5.3-flash")
-    expect(env.aiReviewTimeoutMs).toBe(600000)
+    expect(env.aiReviewTimeoutMs).toBe(900000)
   })
 
   test("reads AI_REVIEW_MODEL verbatim and coerces digit AI_REVIEW_TIMEOUT_MS to a number", () => {

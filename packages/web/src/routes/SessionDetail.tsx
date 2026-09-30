@@ -1,4 +1,13 @@
-import { type Ref, useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
+import {
+  type ReactNode,
+  type Ref,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useFocusTrap } from "../account/useFocusTrap.js"
 import { fetchSessionArtifacts } from "../api/artifacts.js"
@@ -554,10 +563,12 @@ const LESSON_AUDIENCE_LABEL: Readonly<Record<string, string>> = {
 
 // The analyzer id the AI pipeline persists; picked out of the session's review list so the
 // block renders from the same fetch the static review already rides on.
-const AI_ANALYZER = "ai-v1"
+type AiAnalyzer = "ai-v1" | "ai-v2"
 
-const aiReviewOf = (reviews: ReadonlyArray<SessionReviewSummary>): SessionReviewSummary | null =>
-  reviews.find((review) => review.analyzer === AI_ANALYZER) ?? null
+const aiReviewOf = (
+  reviews: ReadonlyArray<SessionReviewSummary>,
+  analyzer: AiAnalyzer,
+): SessionReviewSummary | null => reviews.find((review) => review.analyzer === analyzer) ?? null
 
 const aiSignalsOf = (review: SessionReviewSummary): AiReviewSignals | null =>
   review.signals as AiReviewSignals | null
@@ -758,7 +769,7 @@ const TimeStrip = ({
   }
   const share =
     largest !== null && totalMs > 0
-      ? `${formatSeconds(largest.durationMs ?? 0)} of ${formatSeconds(totalMs)} — ${Math.round(((largest.durationMs ?? 0) / totalMs) * 100)}% — went to ${largest.title}`
+      ? `${formatSeconds(largest.durationMs ?? 0)} of ${formatSeconds(totalMs)} — ${Math.round(((largest.durationMs ?? 0) / totalMs) * 100)}% — went to ${displayReviewText(largest.title)}`
       : null
   return (
     <section className="mt-4">
@@ -769,7 +780,7 @@ const TimeStrip = ({
             key={entry.id}
             className={STRIP_SEGMENT[entry.kind]}
             style={{ width: `${((entry.durationMs ?? 0) / segmentTotal) * 100}%` }}
-            title={`${entry.title} · ${formatSeconds(entry.durationMs ?? 0)}`}
+            title={`${displayReviewText(entry.title)} · ${formatSeconds(entry.durationMs ?? 0)}`}
           />
         ))}
       </div>
@@ -779,6 +790,19 @@ const TimeStrip = ({
 }
 
 type GroundingHref = string | null
+
+/** Keep export references in Evidence, away from the reader-facing review prose. */
+const displayReviewText = (value: string): string =>
+  value
+    .replace(
+      /\s*\(\s*committed as [0-9a-f]{7,40} in-session(?:\s*[,;]\s*msg-\d+(?:[-–]\d+)?)*\s*\)/gi,
+      "",
+    )
+    .replace(/\s*\(\s*msg-\d+(?:[-–]\d+)?(?:\s*[,;]\s*msg-\d+(?:[-–]\d+)?)*\s*\)/gi, "")
+    .replace(/(?:[,;]\s*)?\bmsg-\d+(?:[-–]\d+)?(?:\s*[,;]\s*msg-\d+(?:[-–]\d+)?)*\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,;:.!?])/g, "$1")
+    .trim()
 
 // A stretch of work is a filled circle, an occurrence a square, the moment things turned
 // a diamond — the glyph is the kind, the color marks the turn.
@@ -815,7 +839,6 @@ const TimelineEntryRow = ({
     entry.startMs === undefined || entry.startMs === 0
       ? null
       : `starts ${formatSeconds(entry.startMs)} in`,
-    `seq ${entry.fromSeq}–${entry.toSeq}`,
   ]
     .filter((part): part is string => part !== null)
     .join(" · ")
@@ -826,11 +849,15 @@ const TimelineEntryRow = ({
         className={`mt-0.5 shrink-0 font-mono text-[0.9rem] leading-snug ${TIMELINE_KIND_MARKER[entry.kind]}`}
       />
       <span className="min-w-0">
-        <span className="block text-[0.9375rem] font-semibold leading-snug">{entry.title}</span>
+        <span className="block text-[0.9375rem] font-semibold leading-snug">
+          {displayReviewText(entry.title)}
+        </span>
         <span className="mt-0.5 block font-mono text-[0.72rem] tabular-nums text-ink-soft">
           {meta}
         </span>
-        <span className="mt-1 block text-[0.82rem] text-ink-soft">{entry.summary}</span>
+        <span className="mt-1 block text-[0.82rem] text-ink-soft">
+          {displayReviewText(entry.summary)}
+        </span>
       </span>
     </>
   )
@@ -911,7 +938,7 @@ const LearningRow = ({
   if (isNothingEntry(learning.title)) {
     return (
       <li className="border border-dashed border-rule bg-panel px-3 py-2">
-        <p className="text-[0.875rem] text-ink-soft">{learning.title}</p>
+        <p className="text-[0.875rem] text-ink-soft">{displayReviewText(learning.title)}</p>
       </li>
     )
   }
@@ -929,23 +956,26 @@ const LearningRow = ({
             {learning.severity}
           </Chip>
         )}
-        <span className="text-[0.9375rem] font-semibold leading-snug">{learning.title}</span>
+        <span className="text-[0.9375rem] font-semibold leading-snug">
+          {displayReviewText(learning.title)}
+        </span>
         {learning.cost === undefined ? null : (
           <span className="font-mono text-[0.72rem] text-ink-soft">{learning.cost}</span>
         )}
       </button>
       {open ? (
         <div className="border-t border-rule px-3 pb-3 pt-2">
-          <p className="text-[0.82rem] text-ink-soft">{learning.detail}</p>
+          <p className="text-[0.82rem] text-ink-soft">{displayReviewText(learning.detail)}</p>
           {learning.nextTime === undefined || learning.nextTime.trim() === "" ? null : (
             <p className="mt-1.5 text-[0.82rem] text-ink">
-              <span className="font-semibold">Next time:</span> {learning.nextTime}
+              <span className="font-semibold">Next time:</span>{" "}
+              {displayReviewText(learning.nextTime)}
             </p>
           )}
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {learning.evidence.map((item) => {
               const href = linkFor(item.messageId)
-              const line = `seq ${item.seq} · ${item.what}`
+              const line = displayReviewText(item.what) || "View conversation evidence"
               return (
                 <li key={`${item.seq}·${item.messageId}`}>
                   {href === null ? (
@@ -975,6 +1005,302 @@ const LensHeading = ({ children }: { children: React.ReactNode }) => (
     {children}
   </h3>
 )
+
+type CodeAwareImprovement = NonNullable<AiReviewSignals["improvements"]>["entries"][number]
+
+const IMPROVEMENT_STATUS_LABEL: Record<CodeAwareImprovement["status"], string> = {
+  "already-present": "Already present",
+  "resolved-in-session": "Resolved",
+  pending: "Still to do",
+  unverified: "Unverified",
+}
+
+const IMPROVEMENT_STATUS_TONE: Record<CodeAwareImprovement["status"], string> = {
+  "already-present": "border-custody/40 bg-custody/5 text-custody",
+  "resolved-in-session": "border-ok/40 bg-ok/10 text-ok",
+  pending: "border-warn/40 bg-warn/10 text-warn",
+  unverified: "border-rule bg-panel text-ink-soft",
+}
+
+const codeLocationOf = (citation: CodeAwareImprovement["codeEvidence"][number]): string => {
+  const file = citation.path.split(/[\\/]/).at(-1) ?? citation.path
+  if (citation.fromLine === undefined) return file
+  return citation.toLine === undefined || citation.toLine === citation.fromLine
+    ? `${file}:${citation.fromLine}`
+    : `${file}:${citation.fromLine}–${citation.toLine}`
+}
+
+const INLINE_CODE_LOCATION = /(?:[\w.-]+\/)*[\w.-]+\.[\w-]+:\d+(?:[–-]\d+)?/g
+
+const codeProofTextOf = (item: CodeAwareImprovement): string => {
+  if (item.codeProof === undefined) return "Repository evidence still needs verification."
+  let proof = displayReviewText(item.codeProof).replace(
+    /\b(?:at\s+)?lines?\s+(\d+)(?:\s*[–-]\s*(\d+))?/gi,
+    (original, startText: string, endText: string | undefined) => {
+      const start = Number(startText)
+      const end = endText === undefined ? start : Number(endText)
+      const matches = item.codeEvidence.filter(
+        (citation) =>
+          citation.fromLine !== undefined &&
+          citation.fromLine <= start &&
+          (citation.toLine ?? citation.fromLine) >= end,
+      )
+      const citation = matches[0]
+      if (matches.length !== 1 || citation === undefined) return original
+      const file = citation.path.split(/[\\/]/).at(-1) ?? citation.path
+      return `${file}:${start}${end === start ? "" : `–${end}`}`
+    },
+  )
+  for (const citation of item.codeEvidence) {
+    const file = citation.path.split(/[\\/]/).at(-1) ?? citation.path
+    const citationsForFile = item.codeEvidence.filter(
+      (candidate) => (candidate.path.split(/[\\/]/).at(-1) ?? candidate.path) === file,
+    )
+    if (citationsForFile.length !== 1 || proof.includes(`${file}:`)) continue
+    const escapedFile = file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    proof = proof.replace(
+      new RegExp(`(^|[^\\w./])(${escapedFile})(?![\\w.:-])`),
+      (_match, prefix) => `${prefix}${codeLocationOf(citation)}`,
+    )
+  }
+  return proof
+}
+
+const CodeInsight = ({ item }: { item: CodeAwareImprovement }) => {
+  const proof = codeProofTextOf(item)
+  const inlineMatches = [...proof.matchAll(INLINE_CODE_LOCATION)]
+  const locations = inlineMatches.map((match) => match[0])
+  const highlighted: ReactNode[] = []
+  let cursor = 0
+  for (const match of inlineMatches) {
+    highlighted.push(proof.slice(cursor, match.index))
+    highlighted.push(
+      <code
+        key={`code-${match.index}`}
+        className="rounded-xs border border-custody/40 bg-panel px-1 py-0.5 font-mono text-[0.75rem] text-custody"
+      >
+        {match[0]}
+      </code>,
+    )
+    cursor = match.index + match[0].length
+  }
+  highlighted.push(proof.slice(cursor))
+  const remaining = item.codeEvidence.filter((citation) => {
+    const file = citation.path.split(/[\\/]/).at(-1) ?? citation.path
+    return !locations.some((location) => {
+      const [referencedFile, referencedLine] = location.split(":")
+      const line = Number(referencedLine?.split(/[–-]/)[0])
+      return (
+        referencedFile?.split("/").at(-1) === file &&
+        citation.fromLine !== undefined &&
+        line >= citation.fromLine &&
+        line <= (citation.toLine ?? citation.fromLine)
+      )
+    })
+  })
+  return (
+    <>
+      {highlighted}
+      {remaining.length === 0 ? null : (
+        <span className="mt-2 flex flex-wrap gap-1.5">
+          {remaining.slice(0, 3).map((citation) => (
+            <span
+              key={`${citation.repo}:${citation.path}:${citation.revision}`}
+              className="max-w-full truncate border border-custody/40 bg-panel px-1.5 py-0.5 font-mono text-[0.68rem] text-custody"
+            >
+              {codeLocationOf(citation)}
+            </span>
+          ))}
+          {remaining.length <= 3 ? null : (
+            <span className="text-[0.72rem] text-ink-soft">
+              +{remaining.length - 3} more in Evidence
+            </span>
+          )}
+        </span>
+      )}
+    </>
+  )
+}
+
+const ImprovementRow = ({
+  item,
+  linkFor,
+}: {
+  item: CodeAwareImprovement
+  linkFor: (messageId: string) => GroundingHref
+}) => (
+  <li>
+    <details className="group border border-rule bg-panel">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-3 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 text-[0.9375rem] font-semibold leading-snug">
+          {displayReviewText(item.title)}
+        </span>
+        <span
+          className={`w-fit shrink-0 rounded-xs border px-1.5 py-0.5 font-mono text-[0.65rem] ${IMPROVEMENT_STATUS_TONE[item.status]}`}
+        >
+          {IMPROVEMENT_STATUS_LABEL[item.status]}
+        </span>
+        <span className="ml-auto shrink-0 text-[0.72rem] text-custody group-open:text-ink-soft">
+          Details <span aria-hidden="true">⌄</span>
+        </span>
+      </summary>
+      <div className="border-t border-rule bg-panel-2 p-3 text-[0.82rem] sm:p-4">
+        <dl className="grid gap-2 md:grid-cols-2">
+          <div className="border border-rule bg-panel px-3 py-2.5">
+            <dt className="font-semibold text-ink">Problem</dt>
+            <dd className="mt-1 leading-relaxed text-ink-soft">
+              {displayReviewText(item.sessionTrigger)}
+            </dd>
+          </div>
+          <div className="border border-custody/50 bg-custody/5 px-3 py-2.5">
+            <dt className="font-semibold text-custody">What the code revealed</dt>
+            <dd className="mt-1 leading-relaxed text-ink">
+              <CodeInsight item={item} />
+            </dd>
+          </div>
+          <div className="border border-rule bg-panel px-3 py-2.5">
+            <dt className="font-semibold text-ink">Recommended change</dt>
+            <dd className="mt-1 leading-relaxed text-ink-soft">
+              {displayReviewText(item.proposedChange)}
+            </dd>
+          </div>
+          <div className="border border-rule bg-panel px-3 py-2.5">
+            <dt className="font-semibold text-ink">Future impact</dt>
+            <dd className="mt-1 leading-relaxed text-ink-soft">
+              {displayReviewText(item.futureReuse)}
+            </dd>
+          </div>
+        </dl>
+        <details className="mt-3 border border-rule bg-panel px-3 py-2.5">
+          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 font-semibold text-ink-soft hover:text-ink [&::-webkit-details-marker]:hidden">
+            Evidence
+            <span className="font-mono text-[0.72rem] font-normal">
+              {item.sessionEvidence.length} session refs · {item.codeEvidence.length} code refs
+            </span>
+            <span className="ml-auto text-custody" aria-hidden="true">
+              ⌄
+            </span>
+          </summary>
+          <ul className="mt-3 space-y-2 border-t border-rule pt-3 text-ink-soft">
+            {item.sessionEvidence.map((evidence) => (
+              <li key={`${evidence.seq}:${evidence.messageId}`}>
+                <Link to={linkFor(evidence.messageId) ?? "#"} className="underline">
+                  {displayReviewText(evidence.what) || "View conversation evidence"}
+                </Link>
+              </li>
+            ))}
+            {item.codeEvidence.map((citation) => (
+              <li
+                key={`${citation.repo}:${citation.path}:${citation.revision}`}
+                className="break-all"
+              >
+                <span className="font-mono text-ink">
+                  {citation.path}
+                  {citation.fromLine === undefined
+                    ? ""
+                    : citation.toLine === undefined || citation.toLine === citation.fromLine
+                      ? `:${citation.fromLine}`
+                      : `:${citation.fromLine}–${citation.toLine}`}
+                </span>
+                {` · ${citation.repo} @ ${citation.revision}`}
+              </li>
+            ))}
+          </ul>
+          {item.evidenceBasis === "session-only" ? (
+            <p className="mt-2 text-ink-soft">Repository status has not been verified.</p>
+          ) : null}
+        </details>
+      </div>
+    </details>
+  </li>
+)
+
+const EvidenceCoverage = ({ evidence }: { evidence: NonNullable<AiReviewSignals["evidence"]> }) => {
+  const afterSource = evidence.states?.afterSource ?? "none"
+  const afterState =
+    afterSource === "session-end"
+      ? evidence.states?.end
+      : afterSource === "review-time"
+        ? evidence.states?.review
+        : undefined
+  const afterTree = evidence.states?.afterTree
+  const afterStatus =
+    afterTree === undefined ? "Unavailable" : afterTree.available ? "Complete" : "Partial"
+  return (
+    <section aria-label="Repository evidence" className="mt-3">
+      <p className="mb-1.5 text-[0.72rem] font-semibold text-ink-soft">Repository evidence</p>
+      <div className="grid gap-2 text-[0.78rem] sm:grid-cols-2">
+        <div className="border border-rule bg-panel-2 p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-1">
+            <h4 className="font-semibold">Start tree</h4>
+            <span className="font-mono text-[0.7rem] text-ink-soft">
+              {evidence.tree.available
+                ? "Complete"
+                : evidence.tree.source === "none"
+                  ? "Unavailable"
+                  : "Partial"}
+            </span>
+          </div>
+          <p className="mt-1 text-ink-soft">
+            {evidence.startCommit === null
+              ? "Start commit unavailable"
+              : `Start commit ${evidence.startCommit.slice(0, 12)}`}
+          </p>
+          <p className="mt-1 text-ink-soft">
+            {evidence.states?.start
+              ? `Session start captured · ${evidence.states.start.files.length} changed entries`
+              : "No session-start capture; reconstructed from the commit"}
+          </p>
+          {evidence.tree.files === undefined ? null : (
+            <p className="mt-1 text-ink-soft">{evidence.tree.files.length} files available</p>
+          )}
+        </div>
+        <div className="border border-rule bg-panel-2 p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-1">
+            <h4 className="font-semibold">After tree</h4>
+            <span className="font-mono text-[0.7rem] text-ink-soft">{afterStatus}</span>
+          </div>
+          {afterState === undefined ? (
+            <>
+              <p className="mt-1 text-ink-soft">
+                {afterTree !== undefined
+                  ? "After tree staged; capture details are unavailable in this review."
+                  : afterSource === "none"
+                    ? "No session-end or review-time capture is available."
+                    : "The after capture is unavailable in this review."}
+              </p>
+              {afterTree?.files === undefined ? null : (
+                <p className="mt-1 text-ink-soft">{afterTree.files.length} files available</p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-ink-soft">
+                {afterSource === "session-end" ? "Session end" : "Review time"} captured
+                {` · ${afterState.files.length} changed entries`}
+              </p>
+              <p className="mt-1 text-ink-soft">
+                {afterState.headSha
+                  ? `After commit ${afterState.headSha.slice(0, 12)}`
+                  : "After commit unavailable"}
+              </p>
+              {afterTree === undefined ? (
+                <p className="mt-1 text-ink-soft">The captured after tree could not be staged.</p>
+              ) : afterTree.files === undefined ? null : (
+                <p className="mt-1 text-ink-soft">{afterTree.files.length} files available</p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      {evidence.omissions.length === 0 ? null : (
+        <p className="mt-1.5 text-[0.72rem] text-ink-soft">
+          {evidence.omissions.length} evidence items omitted across the review.
+        </p>
+      )}
+    </section>
+  )
+}
 
 // The two audiences the owner ruled: what the person could do differently and what the
 // agent could do better. Breadcrumbs (reusable discoveries) render as their own section
@@ -1121,6 +1447,7 @@ const AiReviewCard = ({
     learnings: learningsOf(signals, group.name),
   })).filter((group) => group.learnings.length > 0)
   const breadcrumbs = breadcrumbsOf(signals)
+  const improvements = signals?.improvements?.entries ?? []
   const numbers = signals?.numbers
   const totalMs = numbers?.durationMs ?? signals?.totalDurationMs ?? 0
   const [redoOpen, setRedoOpen] = useState(false)
@@ -1131,7 +1458,7 @@ const AiReviewCard = ({
     <article className="border border-rule bg-panel p-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-xs border border-rule px-2 py-0.5 font-mono text-[0.72rem] text-ink-soft">
-          AI review
+          {review.analyzer === "ai-v2" ? "Code-aware AI review" : "AI review"}
         </span>
         <span className="font-mono text-[0.72rem] text-faded">
           Analyzed {absoluteTime(review.analyzedAt ?? review.createdAt)}
@@ -1174,7 +1501,7 @@ const AiReviewCard = ({
           The server is running 4 analyses already — try again in a minute.
         </p>
       ) : null}
-      <p className="mt-2 text-ink">{review.summary}</p>
+      <p className="mt-2 text-ink">{displayReviewText(review.summary)}</p>
       {numbers === undefined ? null : <NumbersLine numbers={numbers} />}
       {signals?.partial === undefined ? null : (
         <PartialBanner partial={signals.partial} recovered={signals.run?.recovered ?? []} />
@@ -1183,7 +1510,27 @@ const AiReviewCard = ({
       {entries.length === 0 ? null : (
         <>
           <TimeStrip entries={entries} totalMs={totalMs} />
-          <TimelineSection entries={entries} linkFor={linkFor} totalMs={totalMs} />
+          {review.analyzer === "ai-v2" ? (
+            <details className="group mt-4 border border-rule bg-panel-2">
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-semibold hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
+                Session timeline
+                <span className="font-mono text-[0.72rem] font-normal text-ink-soft">
+                  {visibleTimelineEntries(entries).length} steps
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="ml-auto text-ink-soft transition-transform group-open:rotate-180"
+                >
+                  ⌄
+                </span>
+              </summary>
+              <div className="border-t border-rule px-3 pb-3">
+                <TimelineSection entries={entries} linkFor={linkFor} totalMs={totalMs} />
+              </div>
+            </details>
+          ) : (
+            <TimelineSection entries={entries} linkFor={linkFor} totalMs={totalMs} />
+          )}
         </>
       )}
 
@@ -1200,6 +1547,31 @@ const AiReviewCard = ({
               </ul>
             </div>
           ))}
+        </section>
+      )}
+
+      {review.analyzer !== "ai-v2" ? null : (
+        <section className="mt-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-[1rem] font-semibold">Improvements for future sessions</h3>
+            <span className="font-mono text-[0.72rem] text-ink-soft">
+              {improvements.length} {improvements.length === 1 ? "finding" : "findings"}
+            </span>
+          </div>
+          {improvements.length === 0 ? (
+            <p className="mt-2 text-[0.82rem] text-ink-soft">
+              No reusable improvements were supported by this session’s evidence.
+            </p>
+          ) : (
+            <ul className="mt-3 flex flex-col gap-2">
+              {improvements.map((item) => (
+                <ImprovementRow key={item.title} item={item} linkFor={linkFor} />
+              ))}
+            </ul>
+          )}
+          {signals?.evidence === undefined ? null : (
+            <EvidenceCoverage evidence={signals.evidence} />
+          )}
         </section>
       )}
 
@@ -1236,6 +1608,7 @@ const AiReviewCard = ({
       )}
       <AnalyzeDialog
         open={redoOpen}
+        defaultAnalyzer={review.analyzer === "ai-v2" ? "ai-v2" : "ai-v1"}
         onClose={() => setRedoOpen(false)}
         restoreFocusTo={() => redoRef.current}
         onRun={(choice) => {
@@ -1496,22 +1869,62 @@ const ReviewPanel = ({
   analysis: AiAnalysis
   onAnalyze: (choice: ReviewerChoice) => void
 }) => {
+  const [selectedAnalyzer, setSelectedAnalyzer] = useState<AiAnalyzer>("ai-v1")
+  const [missingAnalyzer, setMissingAnalyzer] = useState<AiAnalyzer | null>(null)
   if (review.phase === "failed")
     return <Notice>The review could not be retrieved. {review.error.message}</Notice>
   if (review.phase === "loading") return null
   // The AI review is the card. The static analyzer still runs server-side, but its counts
   // read as noise next to the AI verdict, so it no longer renders here.
-  const ai = aiReviewOf(review.reviews)
+  const standard = aiReviewOf(review.reviews, "ai-v1")
+  const codeAware = aiReviewOf(review.reviews, "ai-v2")
+  const ai = aiReviewOf(review.reviews, selectedAnalyzer) ?? standard ?? codeAware
+  const run = (choice: ReviewerChoice): void => {
+    setSelectedAnalyzer(choice.analyzer ?? "ai-v1")
+    onAnalyze(choice)
+  }
   return (
     <div className="flex flex-col gap-4">
       {review.reviews.length === 0 ? (
         <p className="text-ink-soft">This session has not been reviewed yet.</p>
       ) : null}
-      {ai === null ? (
-        <AnalyzeSection analysis={analysis} onStart={onAnalyze} />
-      ) : (
-        <AiReviewCard review={ai} analysis={analysis} onRedo={onAnalyze} />
+      {standard === null && codeAware === null ? null : (
+        <fieldset className="flex flex-wrap gap-2">
+          <legend className="sr-only">Review versions</legend>
+          {(["ai-v1", "ai-v2"] as const).map((analyzer) => {
+            const exists = analyzer === "ai-v1" ? standard !== null : codeAware !== null
+            return (
+              <button
+                key={analyzer}
+                type="button"
+                disabled={!exists && analysis.phase === "running"}
+                aria-pressed={ai?.analyzer === analyzer}
+                onClick={() =>
+                  exists ? setSelectedAnalyzer(analyzer) : setMissingAnalyzer(analyzer)
+                }
+                className="rounded-xs border border-rule px-2 py-1 font-mono text-[0.72rem] text-ink-soft hover:bg-panel-2 disabled:opacity-60"
+              >
+                {analyzer === "ai-v1" ? "Standard review" : "Code-aware review"}
+                {exists ? "" : " · Run"}
+              </button>
+            )
+          })}
+        </fieldset>
       )}
+      {ai === null ? (
+        <AnalyzeSection analysis={analysis} onStart={run} />
+      ) : (
+        <AiReviewCard review={ai} analysis={analysis} onRedo={run} />
+      )}
+      <AnalyzeDialog
+        open={missingAnalyzer !== null}
+        defaultAnalyzer={missingAnalyzer ?? "ai-v1"}
+        onClose={() => setMissingAnalyzer(null)}
+        onRun={(choice) => {
+          setMissingAnalyzer(null)
+          run(choice)
+        }}
+      />
       {review.reviews.length === 0 ? null : (
         <section>
           <h2 className="mb-2 text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-faded">
