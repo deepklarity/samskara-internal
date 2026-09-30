@@ -64,7 +64,8 @@ describe("ai-v2 review contract", () => {
     expect(contract).toContain("400 characters")
     expect(contract).toContain("<detail>")
     expect(contract).toContain("600 characters")
-    expect(contract).toContain("summarize")
+    expect(contract).toContain("Aim comfortably below these limits")
+    expect(contract).toContain("an oversized field rejects the entire review")
   })
 
   test("parses a code-backed improvement separately from v1 lenses", () => {
