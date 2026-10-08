@@ -515,6 +515,93 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("ai review
     expect(rows[0]?.summary).toBe("Clean two-message session.")
   })
 
+  test("A13: GET /:id/analyze/:jobId reports succeeded, failed, unknown, and foreign jobs", async () => {
+    registry = createAiReviewJobRegistry({
+      run: async () => ({ kind: "error", code: "ungrounded", detail: "bad citations" }),
+    })
+    const started = await request(`/api/sessions/${sessionId}/analyze`, { method: "POST" })
+    expect(started.status).toBe(202)
+    const { jobId } = (await started.json()) as { jobId: string }
+    await waitForJob(jobId)
+
+    const failed = await request(`/api/sessions/${sessionId}/analyze/${jobId}`)
+    expect(failed.status).toBe(200)
+    expect(await failed.json()).toEqual({
+      job: {
+        status: "failed",
+        jobId,
+        code: "ungrounded",
+        detail: "bad citations",
+      },
+    })
+
+    registry = createAiReviewJobRegistry()
+    const again = await request(`/api/sessions/${sessionId}/analyze`, { method: "POST" })
+    const { jobId: okId } = (await again.json()) as { jobId: string }
+    const okJob = await waitForJob(okId)
+    expect(okJob).toMatchObject({ status: "succeeded" })
+    const succeeded = await request(`/api/sessions/${sessionId}/analyze/${okId}`)
+    expect(succeeded.status).toBe(200)
+    const succeededBody = (await succeeded.json()) as {
+      job: { status: string; jobId: string; reviewId: string }
+    }
+    expect(succeededBody.job).toMatchObject({ status: "succeeded", jobId: okId })
+    expect(typeof succeededBody.job.reviewId).toBe("string")
+
+    const unknown = await request(`/api/sessions/${sessionId}/analyze/does-not-exist`)
+    expect(unknown.status).toBe(404)
+    expect(await unknown.json()).toEqual({ error: "jobNotFound" })
+
+    // A running job started for another session is not visible here (running jobs
+    // carry their sessionId; settled ones match by unguessable jobId alone).
+    registry = createAiReviewJobRegistry({ run: () => new Promise<AiReviewResult>(() => {}) })
+    const [other] = await db
+      .insert(sessions)
+      .values({ id: "ai-review-other-session", source: "claude_code", userId, projectId })
+      .returning({ id: sessions.id })
+    const otherId = other?.id as string
+    const otherStart = await request(`/api/sessions/${otherId}/analyze`, { method: "POST" })
+    expect(otherStart.status).toBe(202)
+    const { jobId: foreignId } = (await otherStart.json()) as { jobId: string }
+    const foreign = await request(`/api/sessions/${sessionId}/analyze/${foreignId}`)
+    expect(foreign.status).toBe(404)
+    expect(await foreign.json()).toEqual({ error: "jobNotFound" })
+  })
+
+  test("A14: a fifth concurrent analyze is 503 busy, not a silent queue", async () => {
+    registry = createAiReviewJobRegistry({ run: () => new Promise<AiReviewResult>(() => {}) })
+    const ids = [sessionId]
+    for (let i = 0; i < 3; i += 1) {
+      const id = `ai-review-busy-${i}`
+      await db
+        .insert(sessions)
+        .values({ id, source: "claude_code", userId, projectId })
+        .onConflictDoNothing()
+      ids.push(id)
+    }
+    for (const id of ids) {
+      const res = await request(`/api/sessions/${id}/analyze`, { method: "POST" })
+      expect(res.status).toBe(202)
+    }
+    const extra = "ai-review-busy-extra"
+    await db
+      .insert(sessions)
+      .values({ id: extra, source: "claude_code", userId, projectId })
+      .onConflictDoNothing()
+    const busy = await request(`/api/sessions/${extra}/analyze`, { method: "POST" })
+    expect(busy.status).toBe(503)
+    expect(await busy.json()).toEqual({ error: "busy" })
+  })
+
+  test("A15: a non-boolean force in the body is 400 invalidForce", async () => {
+    const res = await request(`/api/sessions/${sessionId}/analyze`, {
+      method: "POST",
+      body: { force: "yes" },
+    })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: "invalidForce" })
+  })
+
   test("A11: GET /api/sessions/reviewer-options lists each harness with its default model and availability", async () => {
     const token = await signToken(env, { sub: userId, aud: "web" })
     const res = await buildApp(db, env, {

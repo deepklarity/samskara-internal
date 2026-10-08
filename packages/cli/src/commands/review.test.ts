@@ -408,4 +408,38 @@ describe("reviewCommand --ai", () => {
     expect(err.join("")).toContain("attaching to the running analysis")
     expect(out.join("")).toContain("shipped — work landed (commit or PR)")
   })
+
+  for (const code of ["harnessFailed", "unparseable", "ungrounded", "deliverableMissing"] as const) {
+    test(`RV16 (${code}): a terminal failed job exits 1 with the code on stderr and no verdict on stdout`, async () => {
+      const out: string[] = []
+      const err: string[] = []
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(jsonRes(202, { jobId: "job-f1" }))
+        .mockResolvedValueOnce(
+          jsonRes(200, {
+            review: null,
+            job: {
+              jobId: "job-f1",
+              status: "running",
+              startedAt: "2026-08-26T09:00:30Z",
+              lastEvent: null,
+            },
+          }),
+        )
+        // Settled jobs leave activeJobForSession, so aireview carries no job —
+        // the CLI then reads the terminal state from the job endpoint.
+        .mockResolvedValueOnce(jsonRes(200, { review: null }))
+        .mockResolvedValueOnce(
+          jsonRes(200, { job: { status: "failed", jobId: "job-f1", code, detail: "boom" } }),
+        )
+      const exitCode = await reviewCommand("s-1", {
+        ai: true,
+        ...aiDepsWith(fetchMock as unknown as typeof fetch, out, err),
+      })
+      expect(exitCode).toBe(1)
+      expect(err.join("")).toContain(code)
+      expect(out.join("")).toBe("")
+    })
+  }
 })

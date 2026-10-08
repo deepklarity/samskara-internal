@@ -106,6 +106,39 @@ const claudeSandboxEnv = (workspaceDir: string): NodeJS.ProcessEnv => ({
 type SpawnCollectResult = { readonly stdout: string; readonly firstByteMs: number | null }
 
 /**
+ * Byte-capped stdout/stderr accumulation with first-byte timing. One helper for both
+ * spawn sites so cap policy changes land once: the soft `spawnCollect` close path and
+ * the msb runner's exec.log close path share collection and differ only afterwards.
+ */
+const makeCollector = (spawnStartedAt: number) => {
+  let stdout = ""
+  let stdoutBytes = 0
+  let stderr = ""
+  let stderrBytes = 0
+  let firstByteMs: number | null = null
+  return {
+    onData:
+      (kind: "stdout" | "stderr") =>
+      (chunk: Buffer): void => {
+        if (firstByteMs === null) firstByteMs = Date.now() - spawnStartedAt
+        const bytes = chunk.byteLength
+        if (kind === "stdout") {
+          if (stdoutBytes < MAX_STDOUT_BYTES) {
+            stdout += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stdoutBytes)
+          }
+          stdoutBytes += bytes
+          return
+        }
+        if (stderrBytes < MAX_STDOUT_BYTES) {
+          stderr += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stderrBytes)
+        }
+        stderrBytes += bytes
+      },
+    snapshot: () => ({ stdout, stderr, firstByteMs }),
+  }
+}
+
+/**
  * One harness CLI run: spawn with captured (and capped) stdout/stderr, first-byte timing,
  * and the timeout → SIGTERM → SIGKILL escalation. Shared by every soft (in-process) runner
  * so opencode and claude behave identically on every failure axis; the msb runner keeps its
@@ -127,32 +160,15 @@ const spawnCollect = (opts: {
       stdio: ["ignore", "pipe", "pipe"],
     })
 
-    let stdout = ""
-    let stdoutBytes = 0
-    let stderr = ""
-    let stderrBytes = 0
-    let firstByteMs: number | null = null
+    const collector = makeCollector(spawnStartedAt)
+    let { stdout, stderr, firstByteMs } = collector.snapshot()
+    const syncStreams = () => {
+      ;({ stdout, stderr, firstByteMs } = collector.snapshot())
+    }
     let settled = false
 
-    const collect =
-      (kind: "stdout" | "stderr") =>
-      (chunk: Buffer): void => {
-        if (firstByteMs === null) firstByteMs = Date.now() - spawnStartedAt
-        const bytes = chunk.byteLength
-        if (kind === "stdout") {
-          if (stdoutBytes < MAX_STDOUT_BYTES) {
-            stdout += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stdoutBytes)
-          }
-          stdoutBytes += bytes
-          return
-        }
-        if (stderrBytes < MAX_STDOUT_BYTES) {
-          stderr += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stderrBytes)
-        }
-        stderrBytes += bytes
-      }
-    child.stdout.on("data", collect("stdout"))
-    child.stderr.on("data", collect("stderr"))
+    child.stdout.on("data", collector.onData("stdout"))
+    child.stderr.on("data", collector.onData("stderr"))
 
     let killTimer: ReturnType<typeof setTimeout> | undefined
     const timeoutTimer = setTimeout(() => {
@@ -178,6 +194,7 @@ const spawnCollect = (opts: {
 
     child.on("close", (code, signal) => {
       finish(() => {
+        syncStreams()
         if (signal === "SIGTERM" || signal === "SIGKILL") {
           reject(
             new HarnessRunnerError(`harness run timed out after ${opts.timeoutMs}ms`, {
@@ -478,32 +495,11 @@ export const createMsbWrappedRunner = (opts: MsbRunnerOpts): HarnessRunner => ({
           stdio: ["ignore", "pipe", "pipe"],
         })
 
-        let stdout = ""
-        let stdoutBytes = 0
-        let stderr = ""
-        let stderrBytes = 0
-        let firstByteMs: number | null = null
+        const collector = makeCollector(spawnStartedAt)
         let settled = false
 
-        const collect =
-          (kind: "stdout" | "stderr") =>
-          (chunk: Buffer): void => {
-            if (firstByteMs === null) firstByteMs = Date.now() - spawnStartedAt
-            const bytes = chunk.byteLength
-            if (kind === "stdout") {
-              if (stdoutBytes < MAX_STDOUT_BYTES) {
-                stdout += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stdoutBytes)
-              }
-              stdoutBytes += bytes
-              return
-            }
-            if (stderrBytes < MAX_STDOUT_BYTES) {
-              stderr += chunk.toString("utf8").slice(0, MAX_STDOUT_BYTES - stderrBytes)
-            }
-            stderrBytes += bytes
-          }
-        child.stdout.on("data", collect("stdout"))
-        child.stderr.on("data", collect("stderr"))
+        child.stdout.on("data", collector.onData("stdout"))
+        child.stderr.on("data", collector.onData("stderr"))
 
         const finish = (fn: () => void) => {
           if (settled) return
@@ -519,6 +515,7 @@ export const createMsbWrappedRunner = (opts: MsbRunnerOpts): HarnessRunner => ({
 
         child.on("close", (code, signal) => {
           finish(() => {
+            const { stdout, stderr, firstByteMs } = collector.snapshot()
             if (signal === "SIGTERM" || signal === "SIGKILL") {
               void (async () => {
                 const trace = await readFailedMsbTrace(sandboxName, stdout)

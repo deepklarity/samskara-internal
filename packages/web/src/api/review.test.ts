@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest"
-import { fetchAiReview } from "./review.js"
+import { fetchAiReview, fetchAiReviewJob, startAiReview } from "./review.js"
 
 const response = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
@@ -45,4 +45,56 @@ test("AR3: a 404 noAiReview still means not-yet — null review, null job, no er
   const result = await fetchAiReview("s-1")
 
   expect(result).toEqual({ ok: true, data: { review: null, job: null } })
+})
+
+test("AR4: fetchAiReviewJob 200-failed returns the terminal code", async () => {
+  const job = { jobId: "job-9", status: "failed", code: "ungrounded" }
+  stubFetch(response(200, { job }))
+
+  const result = await fetchAiReviewJob("s-1", "job-9")
+
+  expect(result).toEqual({ ok: true, data: job })
+})
+
+test("AR5: fetchAiReviewJob 404 maps to null (registry dropped it), not an error", async () => {
+  stubFetch(response(404, { error: "jobNotFound" }))
+
+  const result = await fetchAiReviewJob("s-1", "job-gone")
+
+  expect(result).toEqual({ ok: true, data: null })
+})
+
+test("AR6: fetchAiReviewJob 500 passes the error through", async () => {
+  stubFetch(response(500, { error: "boom" }))
+
+  const result = await fetchAiReviewJob("s-1", "job-9")
+
+  expect(result.ok).toBe(false)
+  if (!result.ok) expect(result.error.kind).toBe("server")
+})
+
+test("AR7: startAiReview 202 returns the jobId", async () => {
+  stubFetch(response(202, { jobId: "job-2" }))
+
+  const result = await startAiReview("s-1")
+
+  expect(result).toEqual({ ok: true, data: { jobId: "job-2" } })
+})
+
+test("AR8: startAiReview 409 surfaces a typed error, not a throw", async () => {
+  stubFetch(response(409, { error: "analysisAlreadyRunning" }))
+
+  const result = await startAiReview("s-1")
+
+  expect(result.ok).toBe(false)
+  if (!result.ok) expect(result.error.code).toBe("analysisAlreadyRunning")
+})
+
+test("AR9: startAiReview 503 surfaces a typed error, not a throw", async () => {
+  stubFetch(response(503, { error: "busy" }))
+
+  const result = await startAiReview("s-1")
+
+  expect(result.ok).toBe(false)
+  if (!result.ok) expect(result.error.code).toBe("busy")
 })

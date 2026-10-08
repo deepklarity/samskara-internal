@@ -172,7 +172,7 @@ const printAiReview = (
     }
   }
   const learnings = lenses
-    .filter((lens) => lens.lens !== "timeline")
+    .filter((lens) => lens.lens !== "timeline" && "learnings" in lens)
     .flatMap((lens) => {
       const who = lens.lens === "humanLearnings" ? "HUMANS" : "AGENTS"
       return lens.learnings.map(
@@ -295,6 +295,32 @@ export const reviewAiOne = async (
       // as `job`) — the same "not yet" a 404 noAiReview has always meant.
       const finished = finishWith(body)
       if (finished !== null) return finished
+      if (body.review === null && body.job === undefined && jobId !== "") {
+        // No review landed and the registry no longer carries a running job: the run
+        // settled without a verdict (settled jobs leave activeJobForSession). Ask the
+        // job endpoint what happened instead of polling to the timeout.
+        const status = await deps
+          .fetch(`${deps.apiBase}/api/sessions/${sessionId}/analyze/${jobId}`, {
+            headers: { authorization: `Bearer ${deps.token}` },
+          })
+          .catch(() => null)
+        if (status?.ok) {
+          const sj = (await status.json()) as {
+            job?: { status?: string; code?: string; detail?: string }
+          }
+          if (sj.job?.status === "failed") {
+            stderr.write(
+              `The AI review failed (${sj.job.code ?? "unknown"})${sj.job.detail ? `: ${sj.job.detail}` : ""} (job ${jobId}).\n`,
+            )
+            return { ok: false }
+          }
+        } else {
+          stderr.write(
+            `The AI review ended without a verdict (job ${jobId} left no trace; the server may have restarted).\n`,
+          )
+          return { ok: false }
+        }
+      }
     } else if (poll.status !== 404) {
       return { ok: false, message: `The server refused the AI review (${poll.status}).` }
     }

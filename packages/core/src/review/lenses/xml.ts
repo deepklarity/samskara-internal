@@ -87,8 +87,7 @@ export type ReviewXmlTag = (typeof REVIEW_XML_TAGS)[number]
  * so tracks defaults are applied and `partial` is attached on a counts mismatch), or a named
  * error. `recovered` names every malformation that was healed OR dropped, in the order the
  * passes ran — empty means the input was canonical. `selfCounts` carries the reviewer's own
- * `<counts>` when they parsed. `healed` is the v1 alias of `recovered`, kept until the
- * server pipeline migrates.
+ * `<counts>` when they parsed.
  */
 export type ReviewXmlResult =
   | {
@@ -96,16 +95,12 @@ export type ReviewXmlResult =
       readonly value: AiReviewPayload
       readonly recovered: ReadonlyArray<string>
       readonly selfCounts?: ReviewCounts
-      /** @deprecated v1 alias of `recovered`; remove once the server pipeline reads `recovered`. */
-      readonly healed: ReadonlyArray<string>
     }
   | {
       readonly ok: false
       readonly error: string
       readonly recovered: ReadonlyArray<string>
       readonly selfCounts?: ReviewCounts
-      /** @deprecated v1 alias of `recovered`; remove once the server pipeline reads `recovered`. */
-      readonly healed: ReadonlyArray<string>
     }
 
 const KNOWN_TAGS = new Set<string>(REVIEW_XML_TAGS)
@@ -799,7 +794,6 @@ export const parseReviewXml = (text: string): ReviewXmlResult => {
       ok: false,
       error: `no <${REVIEW_XML_ROOT}> element found in the output`,
       recovered: healed,
-      healed,
     }
   }
   if (salvaged.changed) healed.push("stripped prose wrapper")
@@ -810,7 +804,6 @@ export const parseReviewXml = (text: string): ReviewXmlResult => {
       ok: false,
       error: `no <${REVIEW_XML_ROOT}> element found in the output`,
       recovered: healed,
-      healed,
     }
   }
 
@@ -896,7 +889,6 @@ export const parseReviewXml = (text: string): ReviewXmlResult => {
       error: `the timeline needs at least one entry — ${why}`,
       recovered: healed,
       ...(selfCounts === undefined ? {} : { selfCounts }),
-      healed,
     }
   }
 
@@ -975,7 +967,6 @@ export const parseReviewXml = (text: string): ReviewXmlResult => {
       error: `schema validation failed: ${issues}`,
       recovered: healed,
       ...(selfCounts === undefined ? {} : { selfCounts }),
-      healed,
     }
   }
 
@@ -992,6 +983,5 @@ export const parseReviewXml = (text: string): ReviewXmlResult => {
     value: partial === undefined ? validated.data : { ...validated.data, partial },
     recovered: healed,
     ...(selfCounts === undefined ? {} : { selfCounts }),
-    healed,
   }
 }
