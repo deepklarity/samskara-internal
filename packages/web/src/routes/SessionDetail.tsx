@@ -57,6 +57,7 @@ import {
   toDetail,
 } from "../session/records.js"
 import { type Tab, type TabId, Tabs } from "../session/Tabs.js"
+import { failedSeqsOf, timelineTone } from "../session/timelineTone.js"
 import { ToolCallsView } from "../session/ToolCallsView.js"
 import { LoadingShell } from "../shell/LoadingShell.js"
 import { absoluteTime } from "../time.js"
@@ -747,6 +748,13 @@ const PartialBanner = ({
 
 // One horizontal bar, proportional to the entries' own durations; a turning point is the
 // accent, everything else neutral. The sentence names the largest share of the session.
+// The bar is colored by what happened: failures read error, slow stretches
+// warning; clean stretches keep the kind color (turning points stay accented).
+const STRIP_TONE: Readonly<Record<string, string | null>> = {
+  good: null,
+  failure: "bg-err",
+  slow: "bg-warn",
+}
 const STRIP_SEGMENT: Readonly<Record<AiTimelineEntryKind, string>> = {
   phase: "bg-faded",
   event: "bg-faded",
@@ -756,9 +764,11 @@ const STRIP_SEGMENT: Readonly<Record<AiTimelineEntryKind, string>> = {
 const TimeStrip = ({
   entries,
   totalMs,
+  failedSeqs,
 }: {
   entries: ReadonlyArray<AiTimelineEntry>
   totalMs: number
+  failedSeqs: ReadonlySet<number>
 }) => {
   const timed = entries.filter((entry) => (entry.durationMs ?? 0) > 0)
   if (timed.length === 0) return null
@@ -778,7 +788,7 @@ const TimeStrip = ({
         {timed.map((entry) => (
           <div
             key={entry.id}
-            className={STRIP_SEGMENT[entry.kind]}
+            className={STRIP_TONE[timelineTone(entry, failedSeqs, totalMs)] ?? STRIP_SEGMENT[entry.kind]}
             style={{ width: `${((entry.durationMs ?? 0) / segmentTotal) * 100}%` }}
             title={`${displayReviewText(entry.title)} · ${formatSeconds(entry.durationMs ?? 0)}`}
           />
@@ -819,14 +829,21 @@ const visibleTimelineEntries = (
 
 // The whole row is the link: the owner asked for navigation from the timeline itself, not
 // just from the evidence chips, so the row rides the same ?m=+tab machinery they use.
+const TONE_MARKER: Readonly<Record<string, string>> = {
+  good: "",
+  failure: "text-err",
+  slow: "text-warn",
+}
 const TimelineEntryRow = ({
   entry,
   href,
   totalMs,
+  tone,
 }: {
   entry: AiTimelineEntry
   href: GroundingHref
   totalMs: number
+  tone: string
 }) => {
   const duration = entry.durationMs
   const share =
@@ -836,6 +853,7 @@ const TimelineEntryRow = ({
   const meta = [
     duration === undefined ? null : formatSeconds(duration),
     share,
+    `seq ${entry.fromSeq}–${entry.toSeq}`,
     entry.startMs === undefined || entry.startMs === 0
       ? null
       : `starts ${formatSeconds(entry.startMs)} in`,
@@ -846,7 +864,7 @@ const TimelineEntryRow = ({
     <>
       <span
         aria-hidden="true"
-        className={`mt-0.5 shrink-0 font-mono text-[0.9rem] leading-snug ${TIMELINE_KIND_MARKER[entry.kind]}`}
+        className={`mt-0.5 shrink-0 font-mono text-[0.9rem] leading-snug ${TIMELINE_KIND_MARKER[entry.kind]} ${TONE_MARKER[tone] ?? ""}`}
       />
       <span className="min-w-0">
         <span className="block text-[0.9375rem] font-semibold leading-snug">
@@ -878,10 +896,12 @@ const TimelineSection = ({
   entries,
   linkFor,
   totalMs,
+  failedSeqs,
 }: {
   entries: ReadonlyArray<AiTimelineEntry>
   linkFor: (messageId: string) => GroundingHref
   totalMs: number
+  failedSeqs: ReadonlySet<number>
 }) => {
   const visible = visibleTimelineEntries(entries)
   return (
@@ -896,6 +916,7 @@ const TimelineSection = ({
               entry={entry}
               href={firstMessageId === undefined ? null : linkFor(firstMessageId)}
               totalMs={totalMs}
+              tone={timelineTone(entry, failedSeqs, totalMs)}
             />
           )
         })}
@@ -975,7 +996,8 @@ const LearningRow = ({
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {learning.evidence.map((item) => {
               const href = linkFor(item.messageId)
-              const line = displayReviewText(item.what) || "View conversation evidence"
+              const what = displayReviewText(item.what) || "View conversation evidence"
+              const line = `seq ${item.seq} · ${what}`
               return (
                 <li key={`${item.seq}·${item.messageId}`}>
                   {href === null ? (
@@ -1410,10 +1432,12 @@ const AiReviewCard = ({
   review,
   analysis,
   onRedo,
+  failedSeqs,
 }: {
   review: SessionReviewSummary
   analysis: AiAnalysis
   onRedo: (choice: ReviewerChoice) => void
+  failedSeqs: ReadonlySet<number>
 }) => {
   const [params] = useSearchParams()
   const { pathname } = useLocation()
@@ -1509,7 +1533,7 @@ const AiReviewCard = ({
 
       {entries.length === 0 ? null : (
         <>
-          <TimeStrip entries={entries} totalMs={totalMs} />
+          <TimeStrip entries={entries} totalMs={totalMs} failedSeqs={failedSeqs} />
           {review.analyzer === "ai-v2" ? (
             <details className="group mt-4 border border-rule bg-panel-2">
               <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-semibold hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
@@ -1525,11 +1549,11 @@ const AiReviewCard = ({
                 </span>
               </summary>
               <div className="border-t border-rule px-3 pb-3">
-                <TimelineSection entries={entries} linkFor={linkFor} totalMs={totalMs} />
+                <TimelineSection entries={entries} linkFor={linkFor} totalMs={totalMs} failedSeqs={failedSeqs} />
               </div>
             </details>
           ) : (
-            <TimelineSection entries={entries} linkFor={linkFor} totalMs={totalMs} />
+            <TimelineSection entries={entries} linkFor={linkFor} totalMs={totalMs} failedSeqs={failedSeqs} />
           )}
         </>
       )}
@@ -1864,10 +1888,12 @@ const ReviewPanel = ({
   review,
   analysis,
   onAnalyze,
+  failedSeqs,
 }: {
   review: ReviewState
   analysis: AiAnalysis
   onAnalyze: (choice: ReviewerChoice) => void
+  failedSeqs: ReadonlySet<number>
 }) => {
   const [selectedAnalyzer, setSelectedAnalyzer] = useState<AiAnalyzer>("ai-v1")
   const [missingAnalyzer, setMissingAnalyzer] = useState<AiAnalyzer | null>(null)
@@ -1914,7 +1940,7 @@ const ReviewPanel = ({
       {ai === null ? (
         <AnalyzeSection analysis={analysis} onStart={run} />
       ) : (
-        <AiReviewCard review={ai} analysis={analysis} onRedo={run} />
+        <AiReviewCard review={ai} analysis={analysis} onRedo={run} failedSeqs={failedSeqs} />
       )}
       <AnalyzeDialog
         open={missingAnalyzer !== null}
@@ -1973,7 +1999,14 @@ const Panel = ({
   if (tab === "pulls")
     return <PullRequestsView pullRequests={payload.pullRequests} onJump={onJump} />
   if (tab === "review")
-    return <ReviewPanel review={review} analysis={analysis} onAnalyze={onAnalyze} />
+    return (
+      <ReviewPanel
+        review={review}
+        analysis={analysis}
+        onAnalyze={onAnalyze}
+        failedSeqs={failedSeqsOf(payload.messages, payload.toolCalls)}
+      />
+    )
 
   return <Conversation detail={detail} inlineTools={inlineTools} />
 }

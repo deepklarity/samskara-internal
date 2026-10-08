@@ -4,6 +4,7 @@ import { buildApp } from "../app.js"
 import type { Db } from "../db/client.js"
 import {
   learnings as learningsTable,
+  learningSessions,
   messages,
   projects,
   sessionReviews,
@@ -68,6 +69,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())(
     const sessionId = "review-test-session"
 
     beforeEach(async () => {
+      await db.delete(learningSessions)
       await db.delete(sessionReviews)
       await db.delete(learningsTable)
       await db.delete(messages)
@@ -497,6 +499,46 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())(
       expect(await missing.json()).toEqual({ error: "sessionNotFound" })
     })
 
+    test("V14: PATCH /api/learnings/:id/route sets, unsets, and rejects unknown routes", async () => {
+      await seedErrorLoop()
+      await request(`/api/sessions/${sessionId}/review`, { method: "POST" })
+      const listed = await request(`/api/learnings?projectId=${projectId}`)
+      const { learnings } = (await listed.json()) as {
+        learnings: { id: string; route: string | null }[]
+      }
+      const target = learnings[0]
+      expect(target).toBeDefined()
+      expect(target?.route).toBeNull()
+
+      const set = await request(`/api/learnings/${target?.id}/route`, {
+        method: "PATCH",
+        body: { route: "docs" },
+      })
+      expect(set.status).toBe(200)
+      const setBody = (await set.json()) as { learning: { route: string } }
+      expect(setBody.learning.route).toBe("docs")
+
+      const relisted = await request(`/api/learnings?projectId=${projectId}`)
+      const relistedBody = (await relisted.json()) as {
+        learnings: { id: string; route: string | null }[]
+      }
+      expect(relistedBody.learnings.find((l) => l.id === target?.id)?.route).toBe("docs")
+
+      const unset = await request(`/api/learnings/${target?.id}/route`, {
+        method: "PATCH",
+        body: { route: null },
+      })
+      expect(unset.status).toBe(200)
+      const unsetBody = (await unset.json()) as { learning: { route: string | null } }
+      expect(unsetBody.learning.route).toBeNull()
+
+      const invalid = await request(`/api/learnings/${target?.id}/route`, {
+        method: "PATCH",
+        body: { route: "wat" },
+      })
+      expect(invalid.status).toBe(400)
+    })
+
     test("V9: the same lesson in two projects appears once in the common view", async () => {
       const [second] = await db
         .insert(projects)
@@ -537,6 +579,109 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())(
       expect(sharedRow?.projectCount).toBe(2)
       expect(sharedRow?.projectNames).toEqual(["P", "Second"])
       expect(body.learnings.some((l) => l.fingerprint === "solo-fp")).toBe(false)
+    })
+
+    test("V16: GET /api/learnings/grouped groups by fingerprint with count, sessions, first/last seen", async () => {
+      const [review] = await db
+        .insert(sessionReviews)
+        .values({
+          sessionId,
+          projectId,
+          analyzer: "heuristic-v1",
+          outcome: "struggled",
+          friction: "high",
+          summary: "struggled",
+          signals: {},
+        })
+        .returning({ id: sessionReviews.id })
+      await db.insert(sessions).values({
+        id: "grouped-session-b",
+        source: "claude_code",
+        userId,
+        projectId,
+        title: "b",
+      })
+      const [learning] = await db
+        .insert(learningsTable)
+        .values({
+          projectId,
+          audience: "agent",
+          category: "tool-retry",
+          title: "Bash failed 3 times in a row",
+          detail: "Change approach.",
+          evidence: [],
+          fingerprint: "grouped-fp",
+          occurrenceCount: 2,
+          sourceReviewId: review?.id as string,
+        })
+        .returning({ id: learningsTable.id })
+      await db.insert(learningSessions).values([
+        { learningId: learning?.id as string, sessionId },
+        { learningId: learning?.id as string, sessionId: "grouped-session-b" },
+      ])
+
+      const res = await request(`/api/learnings/grouped?projectId=${projectId}`)
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as {
+        learnings: {
+          fingerprint: string
+          count: number
+          sessionIds: string[]
+          firstSeenAt: string
+          lastSeenAt: string
+          statusBreakdown: Record<string, number>
+        }[]
+      }
+      const row = body.learnings.find((l) => l.fingerprint === "grouped-fp")
+      expect(row).toBeDefined()
+      expect(row?.count).toBe(2)
+      expect(row?.sessionIds).toEqual(expect.arrayContaining([sessionId, "grouped-session-b"]))
+      expect(row?.firstSeenAt).toBeDefined()
+      expect(row?.lastSeenAt).toBeDefined()
+      expect(row?.statusBreakdown["candidate"]).toBe(1)
+    })
+
+    test("V15: grouped view counts accepted + candidate and honors status filter", async () => {
+      await db.insert(learningsTable).values({
+        projectId,
+        audience: "agent",
+        category: "tool-retry",
+        title: "Same lesson",
+        detail: "d",
+        evidence: [],
+        fingerprint: "dup-fp",
+        status: "candidate",
+        occurrenceCount: 1,
+      })
+      const [other] = await db
+        .insert(projects)
+        .values({ name: "Other", slug: "other", ownerUserId: userId })
+        .returning({ id: projects.id })
+      await db.insert(learningsTable).values({
+        projectId: other?.id as string,
+        audience: "agent",
+        category: "tool-retry",
+        title: "Same lesson",
+        detail: "d",
+        evidence: [],
+        fingerprint: "dup-fp",
+        status: "accepted",
+        occurrenceCount: 3,
+      })
+
+      const res = await request("/api/learnings/grouped")
+      const body = (await res.json()) as {
+        learnings: { fingerprint: string; count: number; statusBreakdown: Record<string, number> }[]
+      }
+      const row = body.learnings.find((l) => l.fingerprint === "dup-fp")
+      expect(row?.count).toBe(4)
+      expect(row?.statusBreakdown).toMatchObject({ candidate: 1, accepted: 1 })
+
+      const accepted = await request("/api/learnings/grouped?status=accepted")
+      const acceptedBody = (await accepted.json()) as {
+        learnings: { fingerprint: string; count: number }[]
+      }
+      expect(acceptedBody.learnings.find((l) => l.fingerprint === "dup-fp")?.count).toBe(3)
     })
   },
 )

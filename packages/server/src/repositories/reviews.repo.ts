@@ -171,6 +171,90 @@ export const listCommonLearnings = async (
   return rows
 }
 
+export type GroupedLearningRow = {
+  readonly fingerprint: string
+  readonly audience: string
+  readonly category: string
+  readonly title: string
+  readonly detail: string
+  readonly count: number
+  readonly sessionIds: ReadonlyArray<string>
+  readonly firstSeenAt: string
+  readonly lastSeenAt: string
+  readonly statusBreakdown: Record<string, number>
+}
+
+/**
+ * Common-denominators view: same fingerprint across many sessions, one row per
+ * fingerprint with count, session list, and first/last seen. Accepted and
+ * candidate both count by default; an explicit status filter narrows to one.
+ * Session list comes from learningSessions (distinct sessions, not reviews).
+ */
+export const listGroupedLearnings = async (
+  db: Querier,
+  userId: string,
+  filter: LearningFilter = {},
+): Promise<GroupedLearningRow[]> => {
+  const conditions = [
+    filter.projectId === undefined ? undefined : eq(learnings.projectId, filter.projectId),
+    filter.audience === undefined ? undefined : eq(learnings.audience, filter.audience),
+    filter.status === undefined
+      ? sql`${learnings.status} in ('candidate', 'accepted')`
+      : eq(learnings.status, filter.status),
+    visibleToUser(db, userId),
+  ].filter((condition) => condition !== undefined)
+  // Two steps, not one join: joining learningSessions fans learnings rows out (one row
+  // per session), which would multiply sum(occurrenceCount). Aggregate learnings first,
+  // then attach the distinct session lists.
+  const groups = await db
+    .select({
+      fingerprint: learnings.fingerprint,
+      audience: sql<string>`min(${learnings.audience})`,
+      category: sql<string>`min(${learnings.category})`,
+      title: sql<string>`min(${learnings.title})`,
+      detail: sql<string>`min(${learnings.detail})`,
+      count: sql<number>`sum(${learnings.occurrenceCount})::int`,
+      firstSeenAt: sql<string>`min(${learnings.firstSeenAt})::text`,
+      lastSeenAt: sql<string>`max(${learnings.lastSeenAt})::text`,
+      statusBreakdown: sql<Record<string, number>>`jsonb_build_object('candidate', count(*) filter (where ${learnings.status} = 'candidate'), 'accepted', count(*) filter (where ${learnings.status} = 'accepted'), 'superseded', count(*) filter (where ${learnings.status} = 'superseded'))`,
+    })
+    .from(learnings)
+    .innerJoin(projects, eq(projects.id, learnings.projectId))
+    .where(and(...conditions))
+    .groupBy(learnings.fingerprint)
+    .orderBy(desc(sql`sum(${learnings.occurrenceCount})`))
+  if (groups.length === 0) return []
+  const fingerprints = groups.map((group) => group.fingerprint)
+  const sessionRows = await db
+    .select({
+      fingerprint: learnings.fingerprint,
+      sessionId: learningSessions.sessionId,
+    })
+    .from(learnings)
+    .innerJoin(learningSessions, eq(learningSessions.learningId, learnings.id))
+    .where(
+      and(
+        sql`${learnings.fingerprint} in ${fingerprints}`,
+        filter.projectId === undefined ? undefined : eq(learnings.projectId, filter.projectId),
+        filter.audience === undefined ? undefined : eq(learnings.audience, filter.audience),
+        filter.status === undefined
+          ? sql`${learnings.status} in ('candidate', 'accepted')`
+          : eq(learnings.status, filter.status),
+      ),
+    )
+  const sessionsByFingerprint = new Map<string, Set<string>>()
+  for (const row of sessionRows) {
+    if (row.sessionId === null) continue
+    const set = sessionsByFingerprint.get(row.fingerprint) ?? new Set<string>()
+    set.add(row.sessionId)
+    sessionsByFingerprint.set(row.fingerprint, set)
+  }
+  return groups.map((group) => ({
+    ...group,
+    sessionIds: [...(sessionsByFingerprint.get(group.fingerprint) ?? new Set<string>())],
+  })) as GroupedLearningRow[]
+}
+
 export const getLearning = async (db: Querier, id: string): Promise<LearningRow | null> => {
   const row = await db.select().from(learnings).where(eq(learnings.id, id)).limit(1)
   return row[0] ?? null
@@ -247,6 +331,21 @@ export const setLearningStatus = async (
   const [row] = await db
     .update(learnings)
     .set({ status, updatedAt: new Date() })
+    .where(eq(learnings.id, id))
+    .returning()
+  return row ?? null
+}
+
+export type LearningRoute = "docs" | "breadcrumbs" | "tools" | "scripts" | "skills" | "code-changes" | "none"
+
+export const setLearningRoute = async (
+  db: Querier,
+  id: string,
+  route: LearningRoute | null,
+): Promise<LearningRow | null> => {
+  const [row] = await db
+    .update(learnings)
+    .set({ route, updatedAt: new Date() })
     .where(eq(learnings.id, id))
     .returning()
   return row ?? null

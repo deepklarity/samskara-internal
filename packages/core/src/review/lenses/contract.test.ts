@@ -67,4 +67,30 @@ describe("reviewContractMd", () => {
     expect(contract).toContain("not the task of reviewing")
     expect(contract).toContain("not any session the transcript merely talks about")
   })
+
+  test("C7: pins the failure-modes checklist with evidence and lens per mode", () => {
+    const contract = flat()
+    expect(contract).toContain("Failure modes")
+    expect(contract).toContain("check every one, each pass")
+    for (const mode of [
+      "Trusted a stale note",
+      "Missed what already exists",
+      "Took the long way",
+      "Hit tool failures",
+      "Started from an unclear task",
+      "Re-read what was already read",
+      "Waited on permission that never came",
+      "Declared done without running anything",
+      "Ignored the docs and skills that were there",
+      "Worked in a line that could have run side by side",
+      "Pushed on through a broken setup",
+    ]) {
+      expect(contract).toContain(mode)
+    }
+    expect(contract).toContain("count them per tool")
+    expect(contract).toContain("no passing result near it")
+    expect(contract).toContain("Feeds humanLearnings")
+    expect(contract).toContain("Feeds agentLearnings")
+    expect(contract).toContain("say so in the summary instead of stretching one")
+  })
 })

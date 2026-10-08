@@ -11,10 +11,12 @@ import {
   getLearning,
   type LearningRow,
   listCommonLearnings,
+  listGroupedLearnings,
   listLearnings,
   listLearningsForSession,
   listReviewsForSession,
   setLearningStatus,
+  setLearningRoute,
   visibleSessionProjectId,
 } from "../repositories/reviews.repo.js"
 import { getDetail } from "../repositories/sessions.repo.js"
@@ -45,6 +47,7 @@ const serializeLearning = (row: LearningRow) => ({
   evidence: row.evidence,
   fingerprint: row.fingerprint,
   status: row.status,
+  route: row.route ?? null,
   occurrenceCount: row.occurrenceCount,
   firstSeenAt: new Date(row.firstSeenAt).toISOString(),
   lastSeenAt: new Date(row.lastSeenAt).toISOString(),
@@ -52,6 +55,7 @@ const serializeLearning = (row: LearningRow) => ({
 
 const audienceSchema = z.enum(["agent", "human"])
 const statusSchema = z.enum(["candidate", "accepted", "superseded"])
+const routeSchema = z.enum(["docs", "breadcrumbs", "tools", "scripts", "skills", "code-changes", "none"])
 
 /** The per-run reviewer choice the modal posts; absent fields keep the env defaults. */
 const analyzeBodySchema = z
@@ -89,6 +93,22 @@ export const learningsRoutes = ({ db, env }: Deps) =>
       return c.json({ learnings: rows }, 200)
     })
     /**
+     * Common-denominators view: same fingerprint across sessions, one row per
+     * fingerprint with count, session list, first/last seen, status breakdown.
+     */
+    .get("/grouped", requireAuth({ db, env }, ["web", "cli"]), async (c) => {
+      const audienceRaw = c.req.query("audience")
+      const statusRaw = c.req.query("status")
+      const audience = audienceRaw === undefined ? undefined : audienceSchema.parse(audienceRaw)
+      const status = statusRaw === undefined ? undefined : statusSchema.parse(statusRaw)
+      const rows = await listGroupedLearnings(db, c.get("user").id, {
+        projectId: c.req.query("projectId"),
+        audience,
+        status,
+      })
+      return c.json({ learnings: rows }, 200)
+    })
+    /**
      * Human-check-only promotion (owner ruling 2026-08-26): this route is the one place a
      * lesson's status moves, and only a project editor (or owner/admin) may move it.
      */
@@ -103,6 +123,21 @@ export const learningsRoutes = ({ db, env }: Deps) =>
         const allowed = await canWrite(db, c.get("user").id, existing.projectId)
         if (!allowed) return c.json({ error: "projectForbidden" }, 403)
         const row = await setLearningStatus(db, existing.id, status)
+        if (row === null) return c.json({ error: "learningNotFound" }, 404)
+        return c.json({ learning: serializeLearning(row) }, 200)
+      },
+    )
+    .patch(
+      "/:id/route",
+      requireAuth({ db, env }, ["web", "cli"]),
+      validate("json", z.object({ route: routeSchema.nullable() }).strict()),
+      async (c) => {
+        const { route } = c.req.valid("json")
+        const existing = await getLearning(db, c.req.param("id"))
+        if (existing === null) return c.json({ error: "learningNotFound" }, 404)
+        const allowed = await canWrite(db, c.get("user").id, existing.projectId)
+        if (!allowed) return c.json({ error: "projectForbidden" }, 403)
+        const row = await setLearningRoute(db, existing.id, route)
         if (row === null) return c.json({ error: "learningNotFound" }, 404)
         return c.json({ learning: serializeLearning(row) }, 200)
       },

@@ -1,0 +1,2 @@
+ALTER TABLE "learnings" ADD COLUMN "route" text;--> statement-breakpoint
+ALTER TABLE "learnings" ADD CONSTRAINT "learnings_route_check" CHECK ("learnings"."route" is null or "learnings"."route" in ('docs', 'breadcrumbs', 'tools', 'scripts', 'skills', 'code-changes', 'none'));

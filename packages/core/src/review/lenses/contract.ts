@@ -96,4 +96,43 @@ the human" (or "for the agent"); its nextTime may stay empty.
 - Every real learning needs at least one \`<ref>\`; a claim with no citation is dropped, and
   self-certification is forbidden.
 - If the evidence is thin, say less.
+
+## Failure modes — check every one, each pass
+
+Run through this list before you write the learnings. Each mode says where it shows up in
+\`session.json\` and which section it feeds. When a mode fits, write the learning; when none
+fit, say so in the summary instead of stretching one.
+
+- Trusted a stale note — the agent copied claims from a guide or an old message without
+  checking the code as it stands. Look for excerpts that quote a doc followed by an edit
+  that the code contradicts. Feeds agentLearnings.
+- Missed what already exists — the agent wrote its own scripts or queries instead of using
+  the team's tools. Look for new throwaway scripts where the transcript never mentions the
+  existing tool or command. Feeds agentLearnings, and breadcrumbs when you name the tool.
+- Took the long way — the agent ran repeated searches or raw queries that one tool call
+  could have done. Look for the same search or query shape three or more times in a row.
+  Feeds agentLearnings.
+- Hit tool failures — the agent retried a failing command instead of stopping to read the
+  error. Look for error results on the same tool and count them per tool in the learning.
+  Feeds agentLearnings.
+- Started from an unclear task — the request had two meanings and the agent picked one
+  without asking. Look for the first message carrying two possible readings and no
+  clarifying question after it. Feeds humanLearnings.
+- Re-read what was already read — the agent opened the same files again instead of using
+  what it had. Look for repeat reads of the same path with nothing changed between them.
+  Feeds agentLearnings.
+- Waited on permission that never came — the session stalled on an approval or a blocked
+  prompt. Look for long gaps in \`ts\` after a permission-denied or approval result.
+  Feeds humanLearnings.
+- Declared done without running anything — the agent said the work was finished with no
+  test, check, or run in the transcript to back it. Look for a done claim with no passing
+  result near it. Feeds agentLearnings.
+- Ignored the docs and skills that were there — the transcript never opened the guide or
+  skill the task needed. Look for a wrong turn the open guide would have prevented.
+  Feeds agentLearnings.
+- Worked in a line that could have run side by side — independent calls went one at a
+  time. Look for sequential \`ts\` on calls with no data between them. Feeds agentLearnings.
+- Pushed on through a broken setup — the environment was failing and the agent kept
+  working instead of flagging it. Look for setup or install errors early with normal work
+  continuing after them. Feeds humanLearnings.
 `

@@ -462,6 +462,7 @@ export const learnings = pgTable(
     evidence: jsonb("evidence").notNull(),
     fingerprint: text("fingerprint").notNull(),
     status: text("status").notNull().default("candidate"),
+    route: text("route"),
     occurrenceCount: integer("occurrenceCount").notNull().default(1),
     sourceReviewId: uuid("sourceReviewId").references(() => sessionReviews.id, {
       onDelete: "set null",
@@ -475,6 +476,10 @@ export const learnings = pgTable(
     unique("learnings_project_fingerprint_unique").on(t.projectId, t.fingerprint),
     check("learnings_audience_check", sql`${t.audience} in ('agent', 'human')`),
     check("learnings_status_check", sql`${t.status} in ('candidate', 'accepted', 'superseded')`),
+    check(
+      "learnings_route_check",
+      sql`${t.route} is null or ${t.route} in ('docs', 'breadcrumbs', 'tools', 'scripts', 'skills', 'code-changes', 'none')`,
+    ),
     index("learnings_project_status_idx").on(t.projectId, t.status),
     index("learnings_audience_idx").on(t.audience),
   ],
