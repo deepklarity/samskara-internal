@@ -193,3 +193,22 @@ export const buildSessionExport = (input: {
     },
   }
 }
+
+/**
+ * Deterministic failure census over export records: per-tool failure counts, so the
+ * reviewer cites server-computed numbers instead of recounting transcript errors.
+ * Counts `failure` and `cancelled` result statuses folded into toolCall records;
+ * calls with no result yet (status undefined) count as neither.
+ */
+export const toolFailuresOf = (
+  records: ReadonlyArray<SessionExportRecord>,
+): Record<string, number> => {
+  const failures: Record<string, number> = {}
+  for (const record of records) {
+    if (record.msgType !== "toolCall") continue
+    if (record.status !== "failure" && record.status !== "cancelled") continue
+    const name = record.toolName ?? "unknown"
+    failures[name] = (failures[name] ?? 0) + 1
+  }
+  return failures
+}

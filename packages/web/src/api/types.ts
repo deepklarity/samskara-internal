@@ -137,6 +137,8 @@ export type AiReviewNumbers = {
   readonly durationMs?: number
   readonly recordCount?: number
   readonly toolCallCount?: number
+  /** Deterministic per-tool failure census (failure + cancelled statuses). */
+  readonly toolFailures?: Record<string, number>
   readonly inputTokens?: number
   readonly outputTokens?: number
   readonly cachedTokens?: number

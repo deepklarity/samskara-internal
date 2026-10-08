@@ -26,6 +26,7 @@ import {
   reviewXmlTemplate,
   reviewXmlTemplateV2,
   sessionIndexFrom,
+  toolFailuresOf,
   validateGrounding,
   validateGroundingV2,
 } from "@samskara/core"
@@ -496,6 +497,10 @@ export const runAiReview = async (
       durationMs: detail.session.durationMs === null ? null : Number(detail.session.durationMs),
       recordCount: sessionExport.records.length,
       toolCallCount: sessionExport.records.filter((record) => record.msgType === "toolCall").length,
+      // Deterministic failure census from the same export: per-tool failure counts the
+      // reviewer cites instead of recounting (real sessions fail Bash ~5% of calls and
+      // almost nothing else — mined from 188 transcripts, 8511 calls, 2026-10-08).
+      toolFailures: toolFailuresOf(sessionExport.records),
       inputTokens: detail.tokenUsage.inputTokens,
       outputTokens: detail.tokenUsage.outputTokens,
       cachedTokens: detail.tokenUsage.cachedTokens,

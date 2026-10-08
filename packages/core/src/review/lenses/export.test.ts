@@ -4,6 +4,7 @@ import {
   ASSISTANT_TEXT_EXCERPT_CHARS,
   buildSessionExport,
   REASONING_TEXT_EXCERPT_CHARS,
+  toolFailuresOf,
   USER_TEXT_EXCERPT_CHARS,
 } from "./export.js"
 
@@ -39,6 +40,38 @@ const toolResult = (
     details: { callId, output: {}, status },
     ...overrides,
   })
+
+describe("toolFailuresOf", () => {
+  test("E20: counts failure and cancelled per tool, ignores success and pending calls", () => {
+    const exported = buildSessionExport({
+      sessionId: "s1",
+      title: "t",
+      source: "claude_code",
+      messages: [
+        toolCall("c1", "Bash"),
+        toolResult("c1", "failure"),
+        toolCall("c2", "Bash"),
+        toolResult("c2", "failure"),
+        toolCall("c3", "Read"),
+        toolResult("c3", "success"),
+        toolCall("c4", "Edit"),
+        toolResult("c4", "cancelled"),
+        toolCall("c5", "Write"),
+      ],
+    })
+    expect(toolFailuresOf(exported.records)).toEqual({ Bash: 2, Edit: 1 })
+  })
+
+  test("E21: no failures yields an empty census, not a missing one", () => {
+    const exported = buildSessionExport({
+      sessionId: "s1",
+      title: "t",
+      source: "claude_code",
+      messages: [toolCall("c1", "Bash"), toolResult("c1", "success")],
+    })
+    expect(toolFailuresOf(exported.records)).toEqual({})
+  })
+})
 
 describe("buildSessionExport", () => {
   test("E1: collapses each tool pair into one record and drops turnEvent/custom entirely", () => {

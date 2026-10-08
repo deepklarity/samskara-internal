@@ -113,7 +113,8 @@ fit, say so in the summary instead of stretching one.
   could have done. Look for the same search or query shape three or more times in a row.
   Feeds agentLearnings.
 - Hit tool failures — the agent retried a failing command instead of stopping to read the
-  error. Look for error results on the same tool and count them per tool in the learning.
+  error. Look for error results on the same tool and count them per tool in the learning. The
+  run's numbers carry the same per-tool counts — cite them instead of recounting.
   Feeds agentLearnings.
 - Started from an unclear task — the request had two meanings and the agent picked one
   without asking. Look for the first message carrying two possible readings and no
