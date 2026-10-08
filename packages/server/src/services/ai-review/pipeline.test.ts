@@ -952,6 +952,90 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     expect(detail.problems[0]?.path).toContain("messageIds")
   })
 
+  test("P8b: ai-v2 with a claude harness rejects before staging (code evidence needs MSB opencode)", async () => {
+    const { runner, runs } = fakeRunner(() => ({ stdout: "ready", file: "unused" }))
+    const result = await runAiReview(depsWith(runner), userId, sessionId, {
+      analyzer: "ai-v2",
+      harness: "claude",
+    })
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.code).toBe("harnessFailed")
+    expect(runs).toHaveLength(0)
+  })
+
+  test("P8c: ai-v2 with a valid transcript but a phantom code citation -> ungrounded (code path)", async () => {
+    const seq = sessionExport.index.seqs[0] as number
+    const msgId = sessionExport.index.messageIds[0] as string
+    const v2Xml = xmlOf(validPayload(sessionExport.index))
+      .replace(
+        "  <counts ",
+        `  <improvements>
+    <improvement status="unverified" evidenceBasis="code-backed">
+      <title>Centralize the retry helper</title>
+      <detail>The session retried inline; a helper exists nowhere.</detail>
+      <sessionTrigger>Inline retry in the transcript.</sessionTrigger>
+      <systemGap>No shared retry helper.</systemGap>
+      <codeProof>The helper is absent from the tree.</codeProof>
+      <futureReuse>Reuse the helper next time.</futureReuse>
+      <proposedChange>Add the helper to the toolkit.</proposedChange>
+      <counterfactual>Without it the next session retries inline again.</counterfactual>
+      <validationIdea>Search the tree for the helper name.</validationIdea>
+      <sessionEvidence><ref seq="${seq}" messageId="${msgId}"><what>the inline retry</what></ref></sessionEvidence>
+      <codeEvidence><citation repo="ghost" path="nope.ts" revision="deadbeef" /></codeEvidence>
+    </improvement>
+  </improvements>
+  <counts `,
+      )
+      .replace('breadcrumbs="1"/>', 'breadcrumbs="1" improvements="1"/>')
+    const { runner } = fakeRunner(() => ({ stdout: "ready", file: v2Xml }))
+    const result = await runAiReview(depsWith(runner), userId, sessionId, { analyzer: "ai-v2" })
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.code).toBe("ungrounded")
+    const detail = result.detail as { problems: Array<{ path: string; problem: string }> }
+    expect(detail.problems.length).toBeGreaterThan(0)
+    expect(detail.problems.some((problem) => problem.path.includes("codeEvidence"))).toBe(true)
+  })
+
+  test("P8d: eleven grounding problems persist capped at ten", async () => {
+    const payload = validPayload(sessionExport.index)
+    const lens = payload.lenses[1] as unknown as {
+      learnings: Array<{ evidence: Array<{ messageId: string }> }>
+    }
+    const first = lens.learnings[0] as unknown as {
+      title: string
+      detail: string
+      nextTime: string
+      category: string
+      audience: string
+      severity: string
+      evidence: Array<{ seq: number; messageId: string; what: string }>
+    }
+    const learnings = Array.from({ length: 11 }, (_, i) => ({
+      ...first,
+      title: `Bad citation ${i}`,
+      evidence: [
+        {
+          seq: sessionExport.index.seqs[0] as number,
+          messageId: "msg-9999",
+          what: "a citation that exists nowhere",
+        },
+      ],
+    }))
+    const broken = {
+      ...payload,
+      lenses: [payload.lenses[0], { lens: "humanLearnings", learnings }],
+    } as unknown as FixturePayload
+    const { runner } = fakeRunner(() => ({ stdout: "ready", file: xmlOf(broken) }))
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.code).toBe("ungrounded")
+    const detail = result.detail as { problems: Array<{ path: string; problem: string }> }
+    expect(detail.problems).toHaveLength(10)
+  })
+
   test("P9: missing review.xml falls back to the fenced XML in stdout (legacy v1 delivery)", async () => {
     const { runner } = fakeRunner(() => ({
       stdout: stdoutWith(validPayload(sessionExport.index)),

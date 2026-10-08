@@ -205,6 +205,30 @@ describe("createClaudeRunner", () => {
       stderr: expect.stringContaining("no credentials"),
     })
   })
+
+  test("R5: a hanging command rejects timedOut carrying stderr (SIGTERM then SIGKILL)", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-hang-test-"))
+    const script = join(workspaceDir, "hanging.sh")
+    // exec: the process IS sleep, so SIGTERM kills it at once. Without exec, bash
+    // would wait out the child and the escalation would take the full 30s.
+    writeFileSync(
+      script,
+      ["#!/usr/bin/env bash", "echo 'still starting' >&2", "exec sleep 30"].join("\n"),
+    )
+    chmodSync(script, 0o755)
+
+    const runner = createOpencodeRunner({
+      model: "fake-model",
+      timeoutMs: 500,
+      log: log(),
+      command: script,
+    })
+    await expect(runner.run({ prompt: "p", workspaceDir })).rejects.toMatchObject({
+      name: "HarnessRunnerError",
+      timedOut: true,
+      stderr: expect.stringContaining("still starting"),
+    })
+  }, 15_000)
 })
 
 /**
@@ -324,8 +348,24 @@ describe("createMsbWrappedRunner", () => {
     expect(inner.join(" ")).not.toContain(workspaceDir)
   })
 
-  test("MR2: buildMsbArgs caps the msb --timeout with a fixed safety margin", () => {
+  test("MR3b: a single quote in the prompt is escaped in the guest shell command, with no host path leak", () => {
     const args = buildMsbArgs({
+      model: "x",
+      timeoutMs: 30_000,
+      image: "node:22-slim",
+      msbSnapshot: undefined,
+      memoryMb: 2048,
+      sandboxName: "samskara-ai-review-test",
+      workspaceDir: "/tmp/ws",
+      prompt: "review the reviewer's output",
+    })
+    const shell = args[args.indexOf("--") + 3] as string
+    // shellQuote wraps in single quotes and escapes inner ones as '\''.
+    expect(shell).toContain("'review the reviewer'\\''s output'")
+    expect(shell).not.toContain("/tmp/ws")
+  })
+
+  test("MR2: buildMsbArgs caps the msb --timeout with a fixed safety margin", () => {    const args = buildMsbArgs({
       model: "x",
       timeoutMs: 60_000,
       image: "node:22-slim",
