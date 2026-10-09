@@ -37,7 +37,9 @@ const BaseEnvSchema = z.object({
 
 /** A model id the paired harness CLI understands when no explicit one is configured. */
 export const DEFAULT_REVIEW_MODEL: Readonly<Record<"opencode" | "claude", string>> = {
-  opencode: "zai-coding-plan/glm-5.3-flash",
+  // Free-plan default: verified working 2026-10-08 (zai-coding-plan/glm-5.3-flash
+  // returned server-side UnknownError on every run). Owner prefers Muse Spark.
+  opencode: "opencode/muse-spark-1.3-contributor-free",
   claude: "sonnet",
 }
 

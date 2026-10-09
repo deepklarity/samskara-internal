@@ -276,6 +276,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("ai review
       durationMs: null,
       recordCount: 2,
       toolCallCount: 0,
+      toolFailures: {},
       inputTokens: 0,
       outputTokens: 0,
       cachedTokens: 0,
@@ -633,9 +634,9 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("ai review
     expect(body.harnesses).toEqual([
       {
         harness: "opencode",
-        defaultModel: "zai-coding-plan/glm-5.3-flash",
+        defaultModel: "opencode/muse-spark-1.3-contributor-free",
         available: true,
-        models: ["zai-coding-plan/glm-5.3-flash", "fake-model"],
+        models: ["opencode/muse-spark-1.3-contributor-free", "fake-model"],
       },
       {
         harness: "claude",

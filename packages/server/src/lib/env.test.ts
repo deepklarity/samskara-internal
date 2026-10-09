@@ -25,7 +25,7 @@ describe("loadEnv", () => {
       localLoginSecret: "",
       localLoginLogin: "samskara-dev",
       aiReviewHarness: "opencode",
-      aiReviewModel: "zai-coding-plan/glm-5.3-flash",
+      aiReviewModel: "opencode/muse-spark-1.3-contributor-free",
       aiReviewTimeoutMs: 900000,
       webDist: undefined,
     })
@@ -107,9 +107,9 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ ...complete, GITHUB_CLIENT_ID: "" })).toThrow(/GITHUB_CLIENT_ID/)
   })
 
-  test("defaults AI_REVIEW_MODEL to zai-coding-plan/glm-5.3-flash and AI_REVIEW_TIMEOUT_MS to 900000", () => {
+  test("defaults AI_REVIEW_MODEL to opencode/muse-spark-1.3-contributor-free and AI_REVIEW_TIMEOUT_MS to 900000", () => {
     const env = loadEnv(complete)
-    expect(env.aiReviewModel).toBe("zai-coding-plan/glm-5.3-flash")
+    expect(env.aiReviewModel).toBe("opencode/muse-spark-1.3-contributor-free")
     expect(env.aiReviewTimeoutMs).toBe(900000)
   })
 
