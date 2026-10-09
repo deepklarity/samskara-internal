@@ -399,7 +399,9 @@ export const runAiReview = async (
       return {
         kind: "error",
         code: "deliverableMissing",
-        detail: { message, lastMilestone },
+        // stdoutStart is the debugging lifeline: an empty or error-shaped start tells
+        // whether the reviewer never spoke, errored fast, or wrote prose instead of XML.
+        detail: { message, lastMilestone, stdoutStart: stdout.slice(0, 400) },
       }
     }
     if (file !== null && file.byteLength > 0 && file.toString("utf8") !== templateXml) {

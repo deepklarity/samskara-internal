@@ -1078,7 +1078,10 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     expect(result.kind).toBe("error")
     if (result.kind !== "error") return
     expect(result.code).toBe("deliverableMissing")
-    expect(result.detail).toMatchObject({ lastMilestone: "harness_complete" })
+    expect(result.detail).toMatchObject({
+      lastMilestone: "harness_complete",
+      stdoutStart: "review.xml ready: 7 timeline entries",
+    })
     const rows = await db
       .select()
       .from(sessionReviews)
