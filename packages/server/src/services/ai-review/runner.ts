@@ -419,7 +419,7 @@ export const buildMsbArgs = (input: BuildMsbArgsInput): string[] => {
       "--",
       "sh",
       "-lc",
-      `npm i -g opencode-ai@${OPENCODE_VERSION} >/dev/null 2>&1 && exec opencode run --auto --model ${input.model} ${shellQuote(input.prompt)} </dev/null`,
+      `npm i -g opencode-ai@${OPENCODE_VERSION} >/dev/null 2>&1 && exec opencode run --auto --model ${shellQuote(input.model)} ${shellQuote(input.prompt)} </dev/null`,
     )
   } else {
     args.push(

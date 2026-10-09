@@ -365,6 +365,21 @@ describe("createMsbWrappedRunner", () => {
     expect(shell).not.toContain("/tmp/ws")
   })
 
+  test("MR3c: the model id is quoted in the guest shell command, not interpolated raw", () => {
+    const args = buildMsbArgs({
+      model: "x; evil",
+      timeoutMs: 30_000,
+      image: "node:22-slim",
+      msbSnapshot: undefined,
+      memoryMb: 2048,
+      sandboxName: "samskara-ai-review-test",
+      workspaceDir: "/tmp/ws",
+      prompt: "p",
+    })
+    const shell = args[args.indexOf("--") + 3] as string
+    expect(shell).toContain("--model 'x; evil'")
+  })
+
   test("MR2: buildMsbArgs caps the msb --timeout with a fixed safety margin", () => {    const args = buildMsbArgs({
       model: "x",
       timeoutMs: 60_000,

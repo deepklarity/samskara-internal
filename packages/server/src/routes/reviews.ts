@@ -63,7 +63,15 @@ const analyzeBodySchema = z
     /** Explicit opt-in while the code-aware contract is evaluated beside ai-v1. */
     analyzer: z.enum(["ai-v1", "ai-v2"]).optional(),
     harness: z.enum(["opencode", "claude"]).optional(),
-    model: z.string().trim().min(1).max(100).optional(),
+    // Model ids reach a guest `sh -lc` string (runner.ts, quoted) and the soft runners'
+    // argv: keep shell metacharacters out at the gate, not at each use site.
+    model: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .regex(/^[A-Za-z0-9._:/-]+$/, "invalidModel")
+      .optional(),
     /** Replace an existing ai-v1 review — the Redo path. The upsert supersedes in place. */
     force: z.boolean().optional(),
   })

@@ -486,6 +486,13 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("ai review
     })
     expect(badModel.status).toBe(400)
     expect(await badModel.json()).toEqual({ error: "invalidModel" })
+
+    const injectedModel = await request(`/api/sessions/${sessionId}/analyze`, {
+      method: "POST",
+      body: { model: "x; rm -rf /tmp/pwned" },
+    })
+    expect(injectedModel.status).toBe(400)
+    expect(await injectedModel.json()).toEqual({ error: "invalidModel" })
   })
 
   test("A12: force=true on a session that already holds an ai-v1 review redoes it instead of 409", async () => {
