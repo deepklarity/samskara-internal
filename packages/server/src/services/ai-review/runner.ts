@@ -257,6 +257,11 @@ const spawnCollect = (opts: {
  * with the workspace as cwd. Nothing is inherited — stdout/stderr are captured by reading the
  * streams incrementally, so output far beyond what anyone would collect is still safe. A
  * non-zero exit or a timeout rejects; the caller decides what that means for the review.
+ *
+ * `--dir` is load-bearing, not redundant with `cwd`: a bare `opencode run` resolves its
+ * project from the ambient session (attaching to a running server's directory), so without
+ * it the reviewer lands in the caller's project, finds no files, and exits 0 with nothing
+ * written — the silent deliverableMissing.
  */
 export const createOpencodeRunner = (opts: {
   model: string
@@ -271,7 +276,7 @@ export const createOpencodeRunner = (opts: {
       ? Promise.reject(new HarnessRunnerError("read-only code evidence requires the MSB runner"))
       : spawnCollect({
           command: opts.command ?? "opencode",
-          args: ["run", "--model", model ?? opts.model, prompt],
+          args: ["run", "--model", model ?? opts.model, prompt, "--dir", workspaceDir],
           cwd: workspaceDir,
           env: sandboxEnv(workspaceDir),
           timeoutMs: opts.timeoutMs,

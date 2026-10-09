@@ -77,6 +77,25 @@ describe("createOpencodeRunner", () => {
     expect(result.stdout).toContain('{"ok": true}')
   })
 
+  test("R1b: the soft runner passes --dir so the reviewer lands in the workspace, not the ambient project", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-runner-dir-"))
+    const script = join(workspaceDir, "fake-opencode.sh")
+    writeFileSync(
+      script,
+      ["#!/usr/bin/env bash", 'echo "args: $*"'].join("\n"),
+    )
+    chmodSync(script, 0o755)
+
+    const runner = createOpencodeRunner({
+      model: "fake-model",
+      timeoutMs: 10_000,
+      log: log(),
+      command: script,
+    })
+    const result = await runner.run({ prompt: "review this session", workspaceDir })
+    expect(result.stdout).toContain(`--dir ${workspaceDir}`)
+  })
+
   test("R2: the soft runner reports a capped stdout tail as agentLog", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-runner-test-"))
     const script = join(workspaceDir, "chatty-opencode.sh")
@@ -366,7 +385,7 @@ describe("createMsbWrappedRunner", () => {
     expect(inner).toContain("-lc")
     const bootstrap = inner[inner.indexOf("-lc") + 1] ?? ""
     expect(bootstrap).toContain("npm i -g opencode-ai@")
-    expect(bootstrap).toContain("opencode run --auto --model zai-coding-plan/glm-5.3")
+    expect(bootstrap).toContain("opencode run --auto --model 'zai-coding-plan/glm-5.3'")
     expect(bootstrap).toContain("'review this session'")
     // The host workspace path must not leak into the guest's command line.
     expect(inner.join(" ")).not.toContain(workspaceDir)
