@@ -229,7 +229,10 @@ describe("reviewCommand --ai", () => {
       .fn()
       .mockResolvedValueOnce(jsonRes(202, { jobId: "job-9" }))
       .mockResolvedValueOnce(noAiReview())
+      // Each 404 re-reads the job endpoint: registry lag (404) means keep polling.
+      .mockResolvedValueOnce(jsonRes(404, { error: "jobNotFound" }))
       .mockResolvedValueOnce(noAiReview())
+      .mockResolvedValueOnce(jsonRes(404, { error: "jobNotFound" }))
       .mockResolvedValueOnce(jsonRes(200, aiBody()))
     const sleeps: number[] = []
     const code = await reviewCommand("s-1", {
@@ -240,7 +243,7 @@ describe("reviewCommand --ai", () => {
       },
     })
     expect(code).toBe(0)
-    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/api/sessions/s-1/analyze")
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/api/sessions/s-1/aireview")
     expect(sleeps).toEqual([3000, 3000])
@@ -386,6 +389,8 @@ describe("reviewCommand --ai", () => {
       )
       // Poll tick: still nothing (the old 404 shape keeps working too).
       .mockResolvedValueOnce(noAiReview())
+      // Terminal check on the 404: registry lag, keep polling.
+      .mockResolvedValueOnce(jsonRes(404, { error: "jobNotFound" }))
       // Progress read on the attached job id.
       .mockResolvedValueOnce(
         jsonRes(200, {
@@ -400,7 +405,7 @@ describe("reviewCommand --ai", () => {
       now: () => new Date("2026-08-26T09:01:00Z"),
     })
     expect(code).toBe(0)
-    expect(fetchMock).toHaveBeenCalledTimes(5)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
     expect(String(fetchMock.mock.calls[2]?.[0])).toContain("/api/sessions/s-1/aireview")
     // The progress read goes to the attached job's id — proof the 409 path joined the
     // right run, not a fresh one.
@@ -442,4 +447,37 @@ describe("reviewCommand --ai", () => {
       expect(out.join("")).toBe("")
     })
   }
+
+  test("RV17: a 404 noAiReview after start reads the job endpoint and reports its failure", async () => {
+    const out: string[] = []
+    const err: string[] = []
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonRes(202, { jobId: "job-f2" }))
+      .mockResolvedValueOnce(
+        jsonRes(200, {
+          review: null,
+          job: {
+            jobId: "job-f2",
+            status: "running",
+            startedAt: "2026-08-26T09:00:30Z",
+            lastEvent: null,
+          },
+        }),
+      )
+      // Settled failures leave no review and no job in the poll view: 404.
+      .mockResolvedValueOnce(jsonRes(404, { error: "noAiReview" }))
+      .mockResolvedValueOnce(
+        jsonRes(200, {
+          job: { status: "failed", jobId: "job-f2", code: "harnessFailed", detail: "boom" },
+        }),
+      )
+    const exitCode = await reviewCommand("s-1", {
+      ai: true,
+      ...aiDepsWith(fetchMock as unknown as typeof fetch, out, err),
+    })
+    expect(exitCode).toBe(1)
+    expect(err.join("")).toContain("harnessFailed")
+    expect(out.join("")).toBe("")
+  })
 })

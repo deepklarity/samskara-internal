@@ -323,6 +323,26 @@ export const reviewAiOne = async (
       }
     } else if (poll.status !== 404) {
       return { ok: false, message: `The server refused the AI review (${poll.status}).` }
+    } else if (jobId !== "") {
+      // 404 noAiReview after we started a job can mean the run settled without a
+      // verdict (settled jobs leave the registry view entirely). Ask the job
+      // endpoint once; a terminal failure reports here instead of polling dead.
+      const status = await deps
+        .fetch(`${deps.apiBase}/api/sessions/${sessionId}/analyze/${jobId}`, {
+          headers: { authorization: `Bearer ${deps.token}` },
+        })
+        .catch(() => null)
+      if (status?.ok) {
+        const sj = (await status.json()) as {
+          job?: { status?: string; code?: string; detail?: string }
+        }
+        if (sj.job?.status === "failed") {
+          stderr.write(
+            `The AI review failed (${sj.job.code ?? "unknown"})${sj.job.detail ? `: ${sj.job.detail}` : ""} (job ${jobId}).\n`,
+          )
+          return { ok: false }
+        }
+      }
     }
     const elapsed = now().getTime()
     if (elapsed >= deadline) {
