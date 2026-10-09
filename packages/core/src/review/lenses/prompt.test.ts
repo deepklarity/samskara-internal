@@ -54,12 +54,27 @@ describe("buildReviewPrompt", () => {
   test("P9: is deterministic for the same input", () => {
     expect(buildReviewPrompt({ sessionMeta })).toBe(buildReviewPrompt({ sessionMeta }))
   })
-
   test("P10: omits absent session timestamps rather than printing blanks", () => {
     const prompt = buildReviewPrompt({
       sessionMeta: { sessionId: "s", title: "t", source: "claude_code" },
     })
     expect(prompt).not.toContain("startedAt:")
     expect(prompt).not.toContain("endedAt:")
+  })
+
+  test("P11: a workspaceDir names absolute paths and orders a verify-first abort", () => {
+    const prompt = buildReviewPrompt({ sessionMeta, workspaceDir: "/tmp/ws-1" })
+    expect(prompt).toContain("/tmp/ws-1/session.json")
+    expect(prompt).toContain("/tmp/ws-1/review.xml")
+    expect(prompt).toContain("/tmp/ws-1/CONTRACT.md")
+    expect(prompt).toContain("If they are not there, reply NO_FILES and stop")
+    expect(prompt).toContain("never review from memory")
+  })
+
+  test("P12: without a workspaceDir the paths stay relative and byte-identical", () => {
+    const prompt = buildReviewPrompt({ sessionMeta })
+    expect(prompt).toContain("- `session.json` —")
+    expect(prompt).not.toContain("NO_FILES")
+    expect(buildReviewPrompt({ sessionMeta })).toBe(prompt)
   })
 })

@@ -399,8 +399,8 @@ export const buildReviewPromptV2 = (options: ReviewPromptOptions): string =>
   buildReviewPrompt(options)
     .replace("The only data source:", "The primary session source:")
     .replace(
-      "- `review.xml` —",
-      "- `/code/evidence-manifest.json` — evidence provenance and omissions. `/code/tree` is the reconstructed start tree, `/code/after/tree` is the captured session-end or review-time tree as labeled in the manifest, and `/code/artifacts` holds separately labeled session changes.\n- `review.xml` —",
+      "the pre-written skeleton you fill in",
+      "the pre-written skeleton you fill in.\n- `/code/evidence-manifest.json` — evidence provenance and omissions. `/code/tree` is the reconstructed start tree, `/code/after/tree` is the captured session-end or review-time tree as labeled in the manifest, and `/code/artifacts` holds separately labeled session changes.",
     )
     .replace(
       "You are reviewing a recorded AI coding session.",

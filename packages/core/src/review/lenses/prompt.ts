@@ -14,6 +14,12 @@ export type ReviewPromptOptions = {
     readonly endedAt?: string
     readonly source: string
   }
+  /**
+   * Absolute workspace dir. The pipeline always passes it; named paths keep the
+   * reviewer from hunting (a lost reviewer exits 0 with nothing written — the
+   * `deliverableMissing` the server cannot distinguish from a quiet success).
+   */
+  readonly workspaceDir?: string
 }
 
 const sessionSection = (meta: ReviewPromptOptions["sessionMeta"]): string[] => [
@@ -27,14 +33,23 @@ const sessionSection = (meta: ReviewPromptOptions["sessionMeta"]): string[] => [
   "",
 ]
 
-const WORKSPACE = [
-  "## Your working directory",
-  "",
-  "- `CONTRACT.md` — the review contract: the exact verdict vocabulary, section rules, attribution and grounding rules, and how to assemble the file. Read it first; re-read any rule whenever you need it.",
-  "- `session.json` — the exported session under review. The only data source: every citable record with seq, id (msg-N), role, tool name, result status, text excerpt, track, ts. Judge this session — not the task of reviewing, and not any session the transcript merely talks about.",
-  "- `review.xml` — the pre-written skeleton you fill in, in place, section by section.",
-  "",
-]
+const workspaceSection = (workspaceDir?: string): string[] => {
+  const at = (name: string): string => (workspaceDir === undefined ? `\`${name}\`` : `\`${workspaceDir}/${name}\``)
+  return [
+    "## Your working directory",
+    "",
+    ...(workspaceDir === undefined
+      ? []
+      : [
+          `0. First run \`pwd\` and \`ls ${workspaceDir}\`. The three files below live under ${workspaceDir} — use those absolute paths for every read and write. If they are not there, reply NO_FILES and stop: never review from memory.`,
+          "",
+        ]),
+    `- ${at("CONTRACT.md")} — the review contract: the exact verdict vocabulary, section rules, attribution and grounding rules, and how to assemble the file. Read it first; re-read any rule whenever you need it.`,
+    `- ${at("session.json")} — the exported session under review. The only data source: every citable record with seq, id (msg-N), role, tool name, result status, text excerpt, track, ts. Judge this session — not the task of reviewing, and not any session the transcript merely talks about.`,
+    `- ${at("review.xml")} — the pre-written skeleton you fill in, in place, section by section.`,
+    "",
+  ]
+}
 
 const DELIVERABLE = [
   "## Deliverable",
@@ -48,7 +63,7 @@ export const buildReviewPrompt = (options: ReviewPromptOptions): string =>
     "You are reviewing a recorded AI coding session.",
     "",
     ...sessionSection(options.sessionMeta),
-    ...WORKSPACE,
+    ...workspaceSection(options.workspaceDir),
     ...DELIVERABLE,
   ]
     .join("\n")

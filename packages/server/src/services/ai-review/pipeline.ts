@@ -293,6 +293,9 @@ export const runAiReview = async (
           ? {}
           : { endedAt: sessionExport.meta.endedAt }),
       },
+      // Absolute paths + verify-first step: a reviewer lost in the wrong cwd exits 0
+      // with nothing written, which reads exactly like a quiet success downstream.
+      ...(workspaceDir === undefined ? {} : { workspaceDir }),
     }
     const prompt =
       analyzer === "ai-v2" ? buildReviewPromptV2(promptOptions) : buildReviewPrompt(promptOptions)
