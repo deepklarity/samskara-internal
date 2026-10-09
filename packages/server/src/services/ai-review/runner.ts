@@ -158,6 +158,10 @@ const spawnCollect = (opts: {
       cwd: opts.cwd,
       env: opts.env,
       stdio: ["ignore", "pipe", "pipe"],
+      // Own process group: the reviewer spawns grandchildren (search tools, language
+      // servers) that inherit these pipes. Killing only the direct child then never
+      // fires `close` — the job sits "running" forever and the workspace leaks.
+      detached: true,
     })
 
     const collector = makeCollector(spawnStartedAt)
@@ -171,11 +175,28 @@ const spawnCollect = (opts: {
     child.stderr.on("data", collector.onData("stderr"))
 
     let killTimer: ReturnType<typeof setTimeout> | undefined
+    // Negative pid signals the whole group (see spawn above); a dead group raises
+    // ESRCH, in which case the direct child is already gone and there is nothing to do.
+    const killGroup = (signal: NodeJS.Signals): void => {
+      if (child.pid === undefined) return
+      try {
+        process.kill(-child.pid, signal)
+      } catch {
+        try {
+          child.kill(signal)
+        } catch {
+          // Already reaped between the exit check and the signal.
+        }
+      }
+    }
     const timeoutTimer = setTimeout(() => {
-      if (child.exitCode !== null || child.signalCode !== null) return
+      // No exitCode check: `close` not having fired means pipes are still open, whether
+      // the direct child is alive or dead with pipe-holding grandchildren. Either way
+      // the group signal is what releases them.
+      if (settled) return
       opts.log.warn({ command: opts.command, timeoutMs: opts.timeoutMs }, "harness run timed out")
-      child.kill("SIGTERM")
-      killTimer = setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS)
+      killGroup("SIGTERM")
+      killTimer = setTimeout(() => killGroup("SIGKILL"), KILL_GRACE_MS)
     }, opts.timeoutMs)
 
     const finish = (fn: () => void) => {

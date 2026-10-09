@@ -206,8 +206,7 @@ describe("createClaudeRunner", () => {
     })
   })
 
-  test("R5: a hanging command rejects timedOut carrying stderr (SIGTERM then SIGKILL)", async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-hang-test-"))
+  test("R5: a hanging command rejects timedOut carrying stderr (SIGTERM then SIGKILL)", async () => {    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-hang-test-"))
     const script = join(workspaceDir, "hanging.sh")
     // exec: the process IS sleep, so SIGTERM kills it at once. Without exec, bash
     // would wait out the child and the escalation would take the full 30s.
@@ -228,6 +227,31 @@ describe("createClaudeRunner", () => {
       timedOut: true,
       stderr: expect.stringContaining("still starting"),
     })
+  }, 15_000)
+
+  test("R5b: a dead parent with pipe-holding grandchildren still settles on timeout", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-orphan-test-"))
+    const script = join(workspaceDir, "orphaning.sh")
+    // The parent exits at once; `sleep` inherits the pipes and holds them 30s. Without
+    // process-group kill the `close` event (and the run) would hang until sleep exits.
+    writeFileSync(
+      script,
+      ["#!/usr/bin/env bash", "echo 'parent leaving' >&2", "sleep 30 &", "exit 0"].join("\n"),
+    )
+    chmodSync(script, 0o755)
+
+    const runner = createOpencodeRunner({
+      model: "fake-model",
+      timeoutMs: 500,
+      log: log(),
+      command: script,
+    })
+    const startedAt = Date.now()
+    const result = await runner.run({ prompt: "p", workspaceDir })
+    // The direct child exited 0, so the run resolves — but only because the timeout's
+    // group signal released the orphaned pipes, years before sleep would have exited.
+    expect(result.exitCode).toBe(0)
+    expect(Date.now() - startedAt).toBeLessThan(10_000)
   }, 15_000)
 })
 
