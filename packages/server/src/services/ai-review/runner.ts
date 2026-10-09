@@ -83,8 +83,24 @@ export class HarnessRunnerError extends Error {
  * `auth.json` into the workspace — both this soft runner and the msb-wrapped one read the
  * same workspace, so a single copy there covers both.
  */
+/**
+ * The reviewer must not inherit the session that spawned the server: when samskara
+ * itself runs inside an opencode pane, OPENCODE/OPENCODE_PID leak through process.env
+ * and the child opencode believes it is nested — it then idles instead of reviewing
+ * (one chat line, exit 0, nothing written: the silent deliverableMissing). Strip every
+ * OPENCODE_* variable in both sandboxes; auth travels via the staged files, not env.
+ */
+const withoutOpencodeInheritance = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
+  const clean: NodeJS.ProcessEnv = {}
+  for (const [key, value] of Object.entries(env)) {
+    if (key === "OPENCODE" || key.startsWith("OPENCODE_")) continue
+    clean[key] = value
+  }
+  return clean
+}
+
 const sandboxEnv = (workspaceDir: string): NodeJS.ProcessEnv => ({
-  ...process.env,
+  ...withoutOpencodeInheritance(process.env),
   XDG_DATA_HOME: join(workspaceDir, "xdg-data"),
   XDG_CONFIG_HOME: join(workspaceDir, "xdg-config"),
   XDG_CACHE_HOME: join(workspaceDir, "xdg-cache"),
@@ -98,7 +114,7 @@ const sandboxEnv = (workspaceDir: string): NodeJS.ProcessEnv => ({
  * alias ids exist to prevent.
  */
 const claudeSandboxEnv = (workspaceDir: string): NodeJS.ProcessEnv => ({
-  ...process.env,
+  ...withoutOpencodeInheritance(process.env),
   CLAUDE_CONFIG_DIR: join(workspaceDir, "claude-config"),
   HOME: join(workspaceDir, "claude-home"),
 })

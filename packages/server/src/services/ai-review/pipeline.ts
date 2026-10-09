@@ -215,20 +215,9 @@ export const runAiReview = async (
       )
       codeDir = staged.codeDir
       evidenceManifest = staged.manifest
-      // OpenCode treats /code as outside its /work project. Its headless permission
-      // request is auto-rejected, so approve guest tool calls without prompting.
-      // MSB's /code:ro mount still enforces immutable evidence bytes.
-      await writeFile(
-        join(workspaceDir, "opencode.json"),
-        `${JSON.stringify(
-          {
-            $schema: "https://opencode.ai/config.json",
-            permission: "allow",
-          },
-          null,
-          2,
-        )}\n`,
-      )
+      // (opencode.json with permission:allow is staged for every analyzer below, so the
+      // reviewer can read the workspace and, here, /code. MSB's /code:ro mount still
+      // enforces immutable evidence bytes.)
       milestone("code_staged", {
         files: evidenceManifest.tree.files.length,
         artifacts: evidenceManifest.artifacts.length,
@@ -247,6 +236,22 @@ export const runAiReview = async (
     const templateXml = analyzer === "ai-v2" ? reviewXmlTemplateV2() : reviewXmlTemplate()
     await writeFile(join(workspaceDir, "review.xml"), templateXml)
     milestone("template_staged")
+    // The reviewer must be able to read and write its own workspace: the sandbox XDG
+    // redirect hides the user's real opencode config, and the default permission policy
+    // auto-rejects reads outside the agent's project — which, headless, is everywhere it
+    // needs. ai-v2 already stages this for /code access; ai-v1 needs it for the workspace
+    // itself. Without it the agent exits 0 after one chat line (silent deliverableMissing).
+    await writeFile(
+      join(workspaceDir, "opencode.json"),
+      `${JSON.stringify(
+        {
+          $schema: "https://opencode.ai/config.json",
+          permission: "allow",
+        },
+        null,
+        2,
+      )}\n`,
+    )
     // The contract lives in the workspace, not the prompt: the agent re-reads any rule on
     // demand instead of spending starting context on the whole spec.
     await writeFile(

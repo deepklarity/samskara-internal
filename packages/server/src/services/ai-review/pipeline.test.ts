@@ -655,6 +655,21 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     expect(runs[0]?.contractMd).toBe(reviewContractMd())
   })
 
+  test("P1c: ai-v1 stages opencode.json permission allow so the sandbox reviewer can read its workspace", async () => {
+    let permission: string | undefined
+    const { runner } = fakeRunner((captured) => {
+      permission = (
+        JSON.parse(readFileSync(join(captured.workspaceDir, "opencode.json"), "utf8")) as {
+          permission: string
+        }
+      ).permission
+      return okBehaviour()
+    })
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result.kind).toBe("ok")
+    expect(permission).toBe("allow")
+  })
+
   test("P11: AI_REVIEW_HARNESS=claude persists the claude harness on the review instead of a hardcoded one", async () => {
     const { runner } = fakeRunner(() => okBehaviour())
     const result = await runAiReview(
