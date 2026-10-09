@@ -207,7 +207,9 @@ export const toolFailuresOf = (
   for (const record of records) {
     if (record.msgType !== "toolCall") continue
     if (record.status !== "failure" && record.status !== "cancelled") continue
-    const name = record.toolName ?? "unknown"
+    // Tool names vary in case by source ("Bash" vs "bash"): census keys are lowercase
+    // so one tool's failures never split across two rows.
+    const name = (record.toolName ?? "unknown").toLowerCase()
     failures[name] = (failures[name] ?? 0) + 1
   }
   return failures

@@ -59,7 +59,7 @@ describe("toolFailuresOf", () => {
         toolCall("c5", "Write"),
       ],
     })
-    expect(toolFailuresOf(exported.records)).toEqual({ Bash: 2, Edit: 1 })
+    expect(toolFailuresOf(exported.records)).toEqual({ bash: 2, edit: 1 })
   })
 
   test("E21: no failures yields an empty census, not a missing one", () => {

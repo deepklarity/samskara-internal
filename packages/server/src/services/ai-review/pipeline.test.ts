@@ -1159,7 +1159,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
       durationMs: 120_000,
       recordCount: 3,
       toolCallCount: 1,
-      toolFailures: { Bash: 1 },
+      toolFailures: { bash: 1 },
       inputTokens: 100,
       outputTokens: 50,
       cachedTokens: 10,
