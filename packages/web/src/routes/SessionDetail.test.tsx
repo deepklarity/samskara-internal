@@ -1991,6 +1991,40 @@ test("AI-9c: where the time went — a proportional strip with titled segments a
   ).toBeInTheDocument()
 })
 
+test("AI-9c: an overnight idle gap is not charged as work — no entry reads as 98% of the timeline", async () => {
+  const user = userEvent.setup()
+  // Entry durations come from record timestamps, so an unattended overnight gap
+  // used to dwarf every real span and make one entry own the whole timeline.
+  const overnight = {
+    ...ENRICHED_AI_REVIEW,
+    signals: {
+      ...ENRICHED_AI_REVIEW.signals,
+      lenses: ENRICHED_AI_REVIEW.signals.lenses.map((lens) =>
+        lens.lens === "timeline"
+          ? {
+              ...lens,
+              entries: (lens.entries ?? []).map((entry, i) => ({
+                ...entry,
+                durationMs: i === 0 ? 39 * 60 * 60_000 : 95_000,
+              })),
+            }
+          : lens,
+      ),
+    },
+  }
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [overnight] } },
+  })
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+
+  const panel = panelOf()
+  // The idle span is clamped, so no single entry claims a runaway share.
+  expect(panel.textContent).not.toMatch(/\b9[0-9]% of timeline/)
+  expect(panel.textContent).not.toMatch(/of 140528s/)
+})
+
 test("AI-9c: timeline rows show duration + seq range, and the whole row navigates to the conversation", async () => {
   const user = userEvent.setup()
   renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {

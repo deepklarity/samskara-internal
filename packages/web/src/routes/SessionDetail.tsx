@@ -771,10 +771,26 @@ const STRIP_SEGMENT: Readonly<Record<AiTimelineEntryKind, string>> = {
   "turning-point": "bg-stamp",
 }
 
-// The entries' own summed durations: the only denominator their shares are honest
+/**
+ * A span longer than this is the session sitting idle, not work: entry durations
+ * come from record timestamps, so an unattended overnight gap otherwise swallows the
+ * whole timeline. Such a span is charged nothing and shown as idle rather than as a
+ * share of the session.
+ */
+const IDLE_GAP_MS = 60 * 60_000
+
+/** True when the span is an unattended gap rather than recorded work. */
+export const isIdleSpan = (entry: AiTimelineEntry): boolean =>
+  (entry.durationMs ?? 0) > IDLE_GAP_MS
+
+/** Work-time for one entry: idle gaps charge nothing, never below zero. */
+export const activeSpanMs = (entry: AiTimelineEntry): number =>
+  isIdleSpan(entry) ? 0 : (entry.durationMs ?? 0)
+
+// The entries' own summed active time: the only denominator their shares are honest
 // against, since the wall-clock session total dwarfs every span.
 const activeTimelineMs = (entries: ReadonlyArray<AiTimelineEntry>): number =>
-  entries.reduce((sum, entry) => sum + (entry.durationMs ?? 0), 0)
+  entries.reduce((sum, entry) => sum + activeSpanMs(entry), 0)
 
 const TimeStrip = ({
   entries,
@@ -785,28 +801,28 @@ const TimeStrip = ({
   totalMs: number
   failedSeqs: ReadonlySet<number>
 }) => {
-  const timed = entries.filter((entry) => (entry.durationMs ?? 0) > 0)
+  const timed = entries.filter((entry) => activeSpanMs(entry) > 0)
   if (timed.length === 0) return null
-  const segmentTotal = timed.reduce((sum, entry) => sum + (entry.durationMs ?? 0), 0)
+  const segmentTotal = timed.reduce((sum, entry) => sum + activeSpanMs(entry), 0)
   let largest: AiTimelineEntry | null = null
   for (const entry of timed) {
-    if (largest === null || (entry.durationMs ?? 0) > (largest.durationMs ?? 0)) largest = entry
+    if (largest === null || activeSpanMs(entry) > activeSpanMs(largest)) largest = entry
   }
   const share =
     largest !== null && segmentTotal > 0
-      ? `${formatSeconds(largest.durationMs ?? 0)} of ${formatSeconds(segmentTotal)} — ${Math.round(((largest.durationMs ?? 0) / segmentTotal) * 100)}% — went to ${displayReviewText(largest.title)}`
+      ? `${formatSeconds(activeSpanMs(largest))} of ${formatSeconds(segmentTotal)} — ${Math.round((activeSpanMs(largest) / segmentTotal) * 100)}% — went to ${displayReviewText(largest.title)}`
       : null
   return (
     <section className="mt-4">
       <LensHeading>Where the time went</LensHeading>
       <div className="flex h-2.5 w-full overflow-hidden rounded-pill border border-rule bg-panel-2">
-        {timed.map((entry) => (
+        {timed.filter((entry) => !isIdleSpan(entry)).map((entry) => (
           <div
             key={entry.id}
             className={
               STRIP_TONE[timelineTone(entry, failedSeqs, totalMs)] ?? STRIP_SEGMENT[entry.kind]
             }
-            style={{ width: `${((entry.durationMs ?? 0) / segmentTotal) * 100}%` }}
+            style={{ width: `${(activeSpanMs(entry) / segmentTotal) * 100}%` }}
             title={`${displayReviewText(entry.title)} · ${formatSeconds(entry.durationMs ?? 0)}`}
           />
         ))}
@@ -860,18 +876,16 @@ const TimelineEntryRow = ({
   activeMs: number
   tone: string
 }) => {
-  const duration = entry.durationMs
-  const pct =
-    duration === undefined || activeMs <= 0
-      ? null
-      : Math.max(1, Math.round((duration / activeMs) * 100))
-  const share = pct === null ? null : `${pct}% of timeline`
+  const idle = isIdleSpan(entry)
+  const active = activeSpanMs(entry)
+  const pct = idle || activeMs <= 0 || active <= 0 ? null : Math.max(1, Math.round((active / activeMs) * 100))
+  const share = idle ? "mostly idle" : pct === null ? null : `${pct}% of timeline`
   // startMs is an epoch timestamp, not an offset into the session — rendering it as
   // "starts Ns in" produced values like "starts 1791349327s in". No session-start
   // epoch reaches this card, so no honest offset exists: the meta stays duration +
   // share + seq range.
   const meta = [
-    duration === undefined ? null : formatSeconds(duration),
+    entry.durationMs === undefined ? null : formatSeconds(entry.durationMs),
     share,
     `seq ${entry.fromSeq}–${entry.toSeq}`,
   ]
