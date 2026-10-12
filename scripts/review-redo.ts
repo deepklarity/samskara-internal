@@ -39,19 +39,9 @@ const { jobId } = (await started.json()) as { jobId: string }
 console.log(`job ${jobId.slice(0, 8)}… started, polling to ${timeoutMs}ms`)
 
 const deadline = Date.now() + timeoutMs
+// Wait for THIS job to settle first: aireview still carries the old row until the
+// redo replaces it, so reading it early prints a stale verdict.
 for (;;) {
-  const res = await api(`/api/sessions/${sessionId}/aireview`)
-  if (res.ok) {
-    const body = (await res.json()) as {
-      review: null | { outcome: string; friction: string; summary: string }
-      job?: { status: string; jobId: string }
-    }
-    if (body.review !== null) {
-      console.log(`VERDICT ${body.review.outcome} / ${body.review.friction}`)
-      console.log(body.review.summary)
-      break
-    }
-  }
   const job = await api(`/api/sessions/${sessionId}/analyze/${jobId}`)
   if (job.ok) {
     const { job: j } = (await job.json()) as {
@@ -61,6 +51,7 @@ for (;;) {
       console.error(`FAILED ${j.code}: ${JSON.stringify(j.detail)?.slice(0, 300)}`)
       process.exit(1)
     }
+    if (j.status === "succeeded") break
     if (Date.now() % 15000 < pollMs) console.log(`… ${j.status} ${j.lastEvent?.name ?? ""}`)
   }
   if (Date.now() >= deadline) {
@@ -69,3 +60,17 @@ for (;;) {
   }
   await new Promise((r) => setTimeout(r, pollMs))
 }
+const res = await api(`/api/sessions/${sessionId}/aireview`)
+if (!res.ok) {
+  console.error(`aireview missing after success: ${res.status}`)
+  process.exit(2)
+}
+const body = (await res.json()) as {
+  review: null | { outcome: string; friction: string; summary: string }
+}
+if (body.review === null) {
+  console.error("job succeeded but no review row landed")
+  process.exit(2)
+}
+console.log(`VERDICT ${body.review.outcome} / ${body.review.friction}`)
+console.log(body.review.summary)
