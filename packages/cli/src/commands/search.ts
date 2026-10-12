@@ -19,6 +19,10 @@ export type SearchFlags = {
   readonly pr?: string
   readonly commit?: string
   readonly aiReview?: string
+  readonly minTokens?: string
+  readonly maxTokens?: string
+  readonly minMinutes?: string
+  readonly maxMinutes?: string
   readonly range?: string
   readonly from?: string
   readonly to?: string
@@ -43,6 +47,10 @@ export const searchQuery = (flags: SearchFlags): URLSearchParams => {
     ["pr", flags.pr],
     ["commit", flags.commit?.toLowerCase()],
     ["aiReview", flags.aiReview],
+    ["minTokens", flags.minTokens],
+    ["maxTokens", flags.maxTokens],
+    ["minMinutes", flags.minMinutes],
+    ["maxMinutes", flags.maxMinutes],
     ["range", flags.range === "all" ? undefined : flags.range],
     ["from", custom ? flags.from : undefined],
     ["to", custom ? flags.to : undefined],

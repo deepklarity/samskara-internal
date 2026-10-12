@@ -116,6 +116,67 @@ test("S44: a session the AI review has not reached carries no badge", () => {
   expect(screen.queryByText("AI review")).not.toBeInTheDocument()
 })
 
+test("token stack renders in/out lines and a size pill from the total", () => {
+  renderRow({
+    ...populated,
+    tokensTotal: 128_400,
+    inputTokens: 100_000,
+    outputTokens: 28_400,
+  } as SessionSummary)
+
+  const row = screen.getByRole("link")
+  expect(row).toHaveTextContent("↑ 100.0k in")
+  expect(row).toHaveTextContent("↓ 28.4k out")
+  expect(row).toHaveTextContent("M")
+  expect(row).not.toHaveTextContent("128.4k tokens")
+})
+
+test("token stack shows cached only when non-trivial", () => {
+  renderRow({
+    ...populated,
+    tokensTotal: 128_400,
+    inputTokens: 100_000,
+    outputTokens: 28_400,
+    cachedTokens: 50_000,
+  } as SessionSummary)
+  expect(screen.getAllByRole("link")[0]).toHaveTextContent("↺ 50.0k cached")
+
+  renderRow({
+    ...populated,
+    tokensTotal: 128_400,
+    inputTokens: 100_000,
+    outputTokens: 28_400,
+    cachedTokens: 10,
+  } as SessionSummary)
+  expect(screen.getAllByRole("link")[1]).not.toHaveTextContent("cached")
+})
+
+test("size pill buckets Small/Medium/Large/Very large + Long past 2h", () => {
+  for (const [total, bucket] of [
+    [50_000, "Small"],
+    [500_000, "Medium"],
+    [5_000_000, "Large"],
+    [12_400_000, "Very large"],
+  ] as const) {
+    renderRow({ ...populated, tokensTotal: total })
+  }
+  const rows = screen.getAllByRole("link")
+  expect(rows[0]).toHaveTextContent("Small")
+  expect(rows[1]).toHaveTextContent("Medium")
+  expect(rows[2]).toHaveTextContent("Large")
+  expect(rows[3]).toHaveTextContent("Very large")
+  expect(rows[0]).not.toHaveTextContent("Long")
+  renderRow({ ...populated, tokensTotal: 50_000, durationMs: 3 * 60 * 60_000 })
+  expect(screen.getAllByRole("link")[4]).toHaveTextContent("Long")
+})
+
+test("without a server breakdown the row falls back to the single total line", () => {
+  renderRow(populated)
+  const row = screen.getByRole("link")
+  expect(row).toHaveTextContent("128.4k tokens")
+  expect(row).not.toHaveTextContent("↑")
+})
+
 test("search evidence renders a supported source label and escaped highlighted text", () => {
   renderRow({
     ...populated,

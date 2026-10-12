@@ -36,6 +36,10 @@ export type SessionFilters = {
   readonly pr: string | null
   readonly commit: string | null
   readonly aiReview: AiReviewState | null
+  readonly minTokens: number | null
+  readonly maxTokens: number | null
+  readonly minMinutes: number | null
+  readonly maxMinutes: number | null
   readonly range: Range
   readonly from: string | null
   readonly to: string | null
@@ -53,6 +57,10 @@ export const EMPTY_FILTERS: SessionFilters = {
   pr: null,
   commit: null,
   aiReview: null,
+  minTokens: null,
+  maxTokens: null,
+  minMinutes: null,
+  maxMinutes: null,
   range: "all",
   from: null,
   to: null,
@@ -88,6 +96,12 @@ const pageNumber = (value: string | null): number => {
   return Number.isSafeInteger(page) ? page : 1
 }
 
+const countParam = (value: string | null): number | null => {
+  if (value === null || !/^[0-9]+$/.test(value)) return null
+  const count = Number(value)
+  return Number.isSafeInteger(count) ? count : null
+}
+
 /**
  * Keep invalid user input in the URL. The API owns validation and must be able to explain a bad
  * PR number, commit prefix, or branch instead of the client silently broadening the search.
@@ -118,6 +132,10 @@ export const parseFilters = (params: URLSearchParams): SessionFilters => {
     aiReview: isAiReviewState(params.get("aiReview"))
       ? (params.get("aiReview") as AiReviewState)
       : null,
+    minTokens: countParam(params.get("minTokens")),
+    maxTokens: countParam(params.get("maxTokens")),
+    minMinutes: countParam(params.get("minMinutes")),
+    maxMinutes: countParam(params.get("maxMinutes")),
     range: isRange(params.get("range")) ? (params.get("range") as Range) : "all",
     from: isoDate(params.get("from")),
     to: isoDate(params.get("to")),
@@ -139,6 +157,10 @@ export const serializeFilters = (filters: SessionFilters): URLSearchParams => {
   if (filters.pr !== null) params.set("pr", filters.pr)
   if (filters.commit !== null) params.set("commit", filters.commit.toLowerCase())
   if (filters.aiReview !== null) params.set("aiReview", filters.aiReview)
+  if (filters.minTokens !== null) params.set("minTokens", String(filters.minTokens))
+  if (filters.maxTokens !== null) params.set("maxTokens", String(filters.maxTokens))
+  if (filters.minMinutes !== null) params.set("minMinutes", String(filters.minMinutes))
+  if (filters.maxMinutes !== null) params.set("maxMinutes", String(filters.maxMinutes))
   if (filters.range !== "all") params.set("range", filters.range)
   if (filters.range === "custom") {
     if (filters.from !== null) params.set("from", filters.from)

@@ -28,6 +28,45 @@ const formatTokens = (total: number): string => {
   return `${(total / unit.scale).toFixed(1)}${unit.suffix} tokens`
 }
 
+/** Compact count without the "tokens" suffix, for the in/out/cached stack. */
+export const formatTokenCount = (total: number): string => {
+  const unit = TOKEN_UNITS.find(({ scale }) => total >= scale)
+  if (unit === undefined) return `${total}`
+  return `${(total / unit.scale).toFixed(1)}${unit.suffix}`
+}
+
+/**
+ * Optional per-direction breakdown. The server list lane currently returns only
+ * `tokensTotal`, so every field here is optional and the row falls back to the
+ * single total line when the breakdown is absent.
+ */
+export type SessionTokenBreakdown = {
+  readonly tokensInput?: number | null
+  readonly tokensOutput?: number | null
+  readonly tokensCached?: number | null
+  /** Legacy alias shape; the API serializes tokensInput/tokensOutput/tokensCached. */
+  readonly inputTokens?: number | null
+  readonly outputTokens?: number | null
+  readonly cachedTokens?: number | null
+}
+
+export type SizeBucket = "Small" | "Medium" | "Large" | "Very large"
+
+export const sizeBucket = (total: number): SizeBucket => {
+  if (total < 100_000) return "Small"
+  if (total < 1_000_000) return "Medium"
+  if (total < 10_000_000) return "Large"
+  return "Very large"
+}
+
+/** Separate duration pill once a session runs past two hours. */
+export const isLongSession = (durationMs: number | null): boolean =>
+  durationMs !== null && durationMs > 2 * 60 * 60_000
+
+/** Cached line is worth a row only when it moves the needle. */
+export const showCachedTokens = (cached: number, total: number): boolean =>
+  cached > 0 && (cached >= 1_000 || (total > 0 && cached / total >= 0.01))
+
 const SOURCE_LABEL: Readonly<Record<SearchSourceKind, string>> = {
   session: "Session",
   message: "Conversation",
@@ -46,6 +85,13 @@ type Props = {
 export const SessionRow = ({ session, to, showProject = true }: Props) => {
   const { title, projectName, userLogin, repo, durationMs, tokensTotal, lastActiveAt } = session
   const match = session.match ?? null
+  const breakdown = session as SessionSummary & SessionTokenBreakdown
+  const input = breakdown.tokensInput ?? breakdown.inputTokens ?? null
+  const output = breakdown.tokensOutput ?? breakdown.outputTokens ?? null
+  const cached = breakdown.tokensCached ?? breakdown.cachedTokens ?? 0
+  const hasBreakdown = typeof input === "number" || typeof output === "number"
+  const showCached = hasBreakdown && showCachedTokens(cached, tokensTotal)
+  const bucket = sizeBucket(tokensTotal)
 
   return (
     <Link
@@ -69,7 +115,31 @@ export const SessionRow = ({ session, to, showProject = true }: Props) => {
         <span className="block truncate font-mono text-[0.72rem] text-ink-soft">
           {userLogin} · {repo === null ? null : `${repoLabel(repo)} · `}
           {durationMs === null ? <Unavailable /> : formatDuration(durationMs)} ·{" "}
-          {formatTokens(tokensTotal)}
+          <span
+            title={`size ${bucket} · ${formatTokens(tokensTotal)} total`}
+            className="inline-flex items-center rounded-xs border border-rule px-1 py-px font-semibold"
+          >
+            {bucket}
+          </span>
+          {isLongSession(durationMs) ? (
+            <span
+              title={`long session · ${formatDuration(durationMs as number)}`}
+              className="ml-1 inline-flex items-center rounded-xs border border-rule px-1 py-px font-semibold"
+            >
+              Long
+            </span>
+          ) : null}
+        </span>
+        <span className="mt-0.5 flex flex-col font-mono text-[0.68rem] leading-4 text-faded">
+          {hasBreakdown ? (
+            <>
+              <span>↑ {formatTokenCount(input ?? 0)} in</span>
+              <span>↓ {formatTokenCount(output ?? 0)} out</span>
+              {showCached ? <span>↺ {formatTokenCount(cached)} cached</span> : null}
+            </>
+          ) : (
+            <span>{formatTokens(tokensTotal)}</span>
+          )}
         </span>
       </span>
 

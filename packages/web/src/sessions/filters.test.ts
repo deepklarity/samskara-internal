@@ -67,6 +67,30 @@ describe("session filter URLs", () => {
     expect(changedFilters(pageThree, { sort: "tokens" }).page).toBe(1)
   })
 
+  test("token and duration bounds round-trip, and malformed values widen", () => {
+    const filters = {
+      ...EMPTY_FILTERS,
+      minTokens: 1000,
+      maxTokens: 50000,
+      minMinutes: 5,
+      maxMinutes: 120,
+    }
+    expect(roundTrip(filters)).toEqual(filters)
+    expect(serializeFilters(filters).toString()).toBe(
+      "minTokens=1000&maxTokens=50000&minMinutes=5&maxMinutes=120",
+    )
+    expect(serializeFilters(EMPTY_FILTERS).toString()).not.toContain("minTokens")
+    const parsed = parseFilters(
+      new URLSearchParams("minTokens=abc&maxTokens=-5&minMinutes=1.5&maxMinutes="),
+    )
+    expect([parsed.minTokens, parsed.maxTokens, parsed.minMinutes, parsed.maxMinutes]).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ])
+  })
+
   test("uses a safe first page for malformed page values", () => {
     expect(parseFilters(new URLSearchParams("page=0")).page).toBe(1)
     expect(parseFilters(new URLSearchParams("page=1.5")).page).toBe(1)

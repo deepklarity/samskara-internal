@@ -37,6 +37,8 @@ const canonicalPr = z
   .refine((value) => Number(value) <= 2_147_483_647)
   .transform(Number)
 
+const nonNegativeInt = z.coerce.number().int().min(0).max(2_147_483_647)
+
 const canonicalCommit = z
   .string()
   .trim()
@@ -65,6 +67,10 @@ export const sessionListQuerySchema = z.object({
   pr: canonicalPr.optional(),
   commit: canonicalCommit.optional(),
   aiReview: z.enum(AI_REVIEW_FILTERS).optional(),
+  minTokens: nonNegativeInt.optional(),
+  maxTokens: nonNegativeInt.optional(),
+  minMinutes: nonNegativeInt.optional(),
+  maxMinutes: nonNegativeInt.optional(),
   range: z.enum(SESSION_RANGES).optional(),
   from: isoDate,
   to: isoDate,
@@ -93,7 +99,17 @@ export const paginate = (total: number, page: number, limit: number): SessionPag
 })
 
 export const parseSessionListQuery = (value: unknown): SessionListQuery => {
-  const parsed = sessionListQuerySchema.parse(value)
+  const parsed = sessionListQuerySchema
+    .refine(
+      (v) => v.minTokens === undefined || v.maxTokens === undefined || v.minTokens <= v.maxTokens,
+      { message: "minTokens must not exceed maxTokens", path: ["minTokens"] },
+    )
+    .refine(
+      (v) =>
+        v.minMinutes === undefined || v.maxMinutes === undefined || v.minMinutes <= v.maxMinutes,
+      { message: "minMinutes must not exceed maxMinutes", path: ["minMinutes"] },
+    )
+    .parse(value)
   return parsed.q === undefined ? parsed : { ...parsed, parsedQuery: parseSessionQuery(parsed.q) }
 }
 

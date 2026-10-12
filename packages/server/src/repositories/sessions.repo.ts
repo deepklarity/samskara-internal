@@ -179,6 +179,9 @@ export type SessionSummaryRow = {
   readonly repo: SessionRepo | null
   readonly durationMs: number | null
   readonly tokensTotal: number
+  readonly tokensInput: number
+  readonly tokensOutput: number
+  readonly tokensCached: number
   readonly status: string
   readonly lastActiveAt: string
   readonly hasAiReview: boolean
@@ -217,6 +220,10 @@ export type SessionListFilter = {
   readonly since?: Date
   /** Exclusive UTC boundary. */
   readonly until?: Date
+  readonly minTokens?: number
+  readonly maxTokens?: number
+  readonly minMinutes?: number
+  readonly maxMinutes?: number
   readonly sort?: "recent" | "oldest" | "tokens" | "project" | "relevance"
   readonly page?: number
   readonly limit?: number
@@ -243,6 +250,13 @@ const durationMs = sql<
   number | null
 >`(extract(epoch from ${sessions.lastMessageAt} - ${sessions.startedAt}) * 1000)::bigint`
 
+const tokenColumnSum = (sessionId: SQL, column: SQL): SQL<number> => sql`(
+  select coalesce(sum(${column}::bigint), 0)::bigint
+  from "tokenUsage"
+  join "messages" on "messages"."id" = "tokenUsage"."messageId"
+  where "messages"."sessionId" = ${sessionId}
+)`
+
 const tokensFor = (sessionId: SQL): SQL<number> => sql`(
   select coalesce(sum(
     "tokenUsage"."inputTokens"::bigint + "tokenUsage"."outputTokens"::bigint
@@ -252,6 +266,17 @@ const tokensFor = (sessionId: SQL): SQL<number> => sql`(
   join "messages" on "messages"."id" = "tokenUsage"."messageId"
   where "messages"."sessionId" = ${sessionId}
 )`
+
+const tokensInputFor = (sessionId: SQL): SQL<number> =>
+  tokenColumnSum(sessionId, sql`"tokenUsage"."inputTokens"`)
+const tokensOutputFor = (sessionId: SQL): SQL<number> =>
+  tokenColumnSum(sessionId, sql`"tokenUsage"."outputTokens"`)
+const tokensCachedFor = (sessionId: SQL): SQL<number> =>
+  tokenColumnSum(sessionId, sql`"tokenUsage"."cachedTokens"`)
+
+/** Duration in whole minutes; null durations never satisfy a bound. */
+const durationMinutes = (lastActive: SQL, started: SQL): SQL<number> =>
+  sql`(extract(epoch from ${lastActive} - ${started}) / 60)::bigint`
 
 /** The badge's definition of "AI analysis ran": a landed ai-v1 row — the same test the analyze route applies. */
 const aiReviewExists = (sessionId: SQL): SQL => sql`exists (
@@ -445,7 +470,7 @@ const safeSnippet = (
 // limit reach sessions_activity_idx and the page stops after `limit` rows.
 const authorizationCte = (db: Querier, userId: string) => sql`
   authorized_sessions as (
-    select "sessions"."id", "sessions"."title", ${sessionActivityAt} as "lastActiveAt", "projects"."id" as "projectId", "projects"."name" as "projectName", "projects"."slug" as "projectSlug", "users"."githubLogin" as "userLogin"
+    select "sessions"."id", "sessions"."title", ${sessionActivityAt} as "lastActiveAt", "sessions"."startedAt" as "startedAt", "projects"."id" as "projectId", "projects"."name" as "projectName", "projects"."slug" as "projectSlug", "users"."githubLogin" as "userLogin"
     from "sessions"
     join "projects" on "projects"."id" = "sessions"."projectId"
     join "users" on "users"."id" = "sessions"."userId"
@@ -510,6 +535,18 @@ const filterPredicates = (
       filter.aiReview === "done"
         ? aiReviewExists(sql`a.id`)
         : sql`not ${aiReviewExists(sql`a.id`)}`,
+    )
+  if (filter.minTokens !== undefined)
+    clauses.push(sql`${tokensFor(sql`a.id`)} >= ${filter.minTokens}`)
+  if (filter.maxTokens !== undefined)
+    clauses.push(sql`${tokensFor(sql`a.id`)} <= ${filter.maxTokens}`)
+  if (filter.minMinutes !== undefined)
+    clauses.push(
+      sql`a."startedAt" is not null and ${durationMinutes(sql`a."lastActiveAt"`, sql`a."startedAt"`)} >= ${filter.minMinutes}`,
+    )
+  if (filter.maxMinutes !== undefined)
+    clauses.push(
+      sql`a."startedAt" is not null and ${durationMinutes(sql`a."lastActiveAt"`, sql`a."startedAt"`)} <= ${filter.maxMinutes}`,
     )
   return clauses
 }
@@ -591,7 +628,8 @@ export const listAccessible = async (
     ), paged as (select * from ranked p order by ${order} limit ${limit} offset ${offset})
     select p.id, ${derivedTitle} as title, p."projectId", p."projectName", p."projectSlug", p."userLogin",
       r.host as "repoHost", r.owner as "repoOwner", r."repoName" as "repoName", ${durationMs} as "durationMs",
-      ${isTokenSort ? sql`p."tokensTotal"` : tokensFor(sql`"sessions"."id"`)} as "tokensTotal", ${status} as status,
+      ${isTokenSort ? sql`p."tokensTotal"` : tokensFor(sql`"sessions"."id"`)} as "tokensTotal",
+      ${tokensInputFor(sql`"sessions"."id"`)} as "tokensInput", ${tokensOutputFor(sql`"sessions"."id"`)} as "tokensOutput", ${tokensCachedFor(sql`"sessions"."id"`)} as "tokensCached", ${status} as status,
       ${aiReviewExists(sql`p.id`)} as "hasAiReview",
       p."lastActiveAt", p."sourceKind", p."sourceRowId", p.score, p.total, t."sourceText",
       case when t."sourceText" is null then null else ts_headline('simple'::regconfig, t."sourceText", ${query ?? sql`null::tsquery`}, ${SNIPPET_OPTIONS}) end as headline
@@ -617,6 +655,9 @@ export const listAccessible = async (
       repoName: row.repoName as string | null,
       durationMs: row.durationMs === null ? null : Number(row.durationMs),
       tokensTotal: Number(row.tokensTotal),
+      tokensInput: Number(row.tokensInput),
+      tokensOutput: Number(row.tokensOutput),
+      tokensCached: Number(row.tokensCached),
       status: row.status as string,
       lastActiveAt: String(row.lastActiveAt),
       hasAiReview: row.hasAiReview === true,

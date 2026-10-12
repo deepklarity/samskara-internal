@@ -101,6 +101,33 @@ const TextFilter = ({
   )
 }
 
+const parseCount = (value: string | null): number | null => {
+  if (value === null) return null
+  const text = value.trim()
+  if (!/^[0-9]+$/.test(text)) return null
+  const count = Number(text)
+  return Number.isSafeInteger(count) ? count : null
+}
+
+const CountFilter = ({
+  label,
+  value,
+  placeholder,
+  onSubmit,
+}: {
+  readonly label: string
+  readonly value: number | null
+  readonly placeholder: string
+  readonly onSubmit: (value: number | null) => void
+}) => (
+  <TextFilter
+    label={label}
+    value={value === null ? null : String(value)}
+    placeholder={placeholder}
+    onSubmit={(raw) => onSubmit(raw === null ? null : parseCount(raw))}
+  />
+)
+
 const RangeControl = ({
   filters,
   onChange,
@@ -310,6 +337,30 @@ export const FilterBar = ({ filters, options, onChange, onClear }: Props) => {
           }
         />
         <RangeControl filters={filters} onChange={onChange} />
+        <CountFilter
+          label="Min tokens"
+          value={filters.minTokens}
+          placeholder="e.g. 1000"
+          onSubmit={(minTokens) => onChange(changedFilters(filters, { minTokens }))}
+        />
+        <CountFilter
+          label="Max tokens"
+          value={filters.maxTokens}
+          placeholder="e.g. 50000"
+          onSubmit={(maxTokens) => onChange(changedFilters(filters, { maxTokens }))}
+        />
+        <CountFilter
+          label="Min minutes"
+          value={filters.minMinutes}
+          placeholder="e.g. 5"
+          onSubmit={(minMinutes) => onChange(changedFilters(filters, { minMinutes }))}
+        />
+        <CountFilter
+          label="Max minutes"
+          value={filters.maxMinutes}
+          placeholder="e.g. 120"
+          onSubmit={(maxMinutes) => onChange(changedFilters(filters, { maxMinutes }))}
+        />
         <Choice
           label="AI analysis"
           value={filters.aiReview ?? ""}

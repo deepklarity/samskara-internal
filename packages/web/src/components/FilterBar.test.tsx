@@ -134,3 +134,16 @@ test("SC65 (regression): Last active and Sort by are still native dropdowns", as
   await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "tokens")
   expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_FILTERS, sort: "tokens" })
 })
+
+test("token and duration bounds apply deliberately on page one", async () => {
+  const user = userEvent.setup()
+  const { onChange } = renderBar({ ...EMPTY_FILTERS, page: 2 })
+
+  await user.type(screen.getByRole("textbox", { name: "Min tokens" }), "1000")
+  await user.click(screen.getAllByRole("button", { name: "Apply" })[2]!)
+  expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_FILTERS, minTokens: 1000 })
+
+  await user.type(screen.getByRole("textbox", { name: "Max minutes" }), "120")
+  await user.click(screen.getAllByRole("button", { name: "Apply" })[5]!)
+  expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_FILTERS, maxMinutes: 120 })
+})
