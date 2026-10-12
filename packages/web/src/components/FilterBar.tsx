@@ -14,13 +14,13 @@ import {
 import { Caret } from "./combobox.js"
 import { Picker } from "./Picker.js"
 import { controlClass, labelClass, TextField } from "./TextField.js"
+import { Button } from "./ui/button.js"
+import { Card, CardContent } from "./ui/card.js"
 
 const asRange = (value: string): Range => RANGES.find((range) => range === value) ?? "all"
 const asSort = (value: string): Sort => SORTS.find((sort) => sort === value) ?? "recent"
 
 const selectClass = `${controlClass} mt-0 cursor-pointer appearance-none pr-7`
-const buttonClass =
-  "h-9 rounded-xs border border-ink bg-ink px-4 text-[0.78rem] font-semibold text-panel-2 transition-colors hover:bg-ink-2"
 
 /** Its two callers map over client constants, so this shape is not the server's to change. */
 type Choosable = { readonly value: string; readonly label: string }
@@ -207,8 +207,8 @@ export const FilterBar = ({ filters, options, onChange, onClear }: Props) => {
   useEffect(() => setQuery(filters.q ?? ""), [filters.q])
 
   return (
-    <section aria-label="Search and filter sessions" className="border border-rule bg-panel p-3">
-      <form
+    <Card aria-label="Search and filter sessions" className="bg-panel p-3">
+      <CardContent className="p-0">      <form
         className="grid grid-cols-1 items-end gap-2 min-[600px]:grid-cols-[minmax(0,1fr)_auto]"
         onSubmit={(event) => {
           event.preventDefault()
@@ -275,9 +275,9 @@ export const FilterBar = ({ filters, options, onChange, onClear }: Props) => {
             to read.
           </span>
         </div>
-        <button type="submit" className={buttonClass}>
+        <Button type="submit">
           Search
-        </button>
+        </Button>
       </form>
 
       <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-rule pt-3">
@@ -384,6 +384,7 @@ export const FilterBar = ({ filters, options, onChange, onClear }: Props) => {
           onChange={(sort) => onChange(changedFilters(filters, { sort: asSort(sort) }))}
         />
       </div>
-    </section>
+      </CardContent>
+    </Card>
   )
 }

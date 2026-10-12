@@ -6,6 +6,8 @@ import { SessionExpired } from "../auth/SessionExpired.js"
 import { optionFor } from "../components/combobox.js"
 import { FilterBar } from "../components/FilterBar.js"
 import { SessionRow } from "../components/SessionRow.js"
+import { Button } from "../components/ui/button.js"
+import { Card, CardContent } from "../components/ui/card.js"
 import {
   EMPTY_FILTERS,
   localTimeZone,
@@ -20,9 +22,8 @@ type State =
   | { readonly phase: "ready"; readonly payload: SessionListPayload }
   | { readonly phase: "failed"; readonly error: ApiError }
 
-const panelClass = "border border-dashed border-rule bg-panel p-8 text-center"
-const primaryButton =
-  "mt-4 inline-flex items-center justify-center rounded-xs border border-ink bg-ink px-4 py-2 text-panel-2 transition-colors hover:bg-ink-2"
+const panelClass = "border-dashed bg-panel p-8 text-center"
+const primaryButtonClass = "mt-4"
 
 const NoResults = ({
   hasFilters,
@@ -31,7 +32,8 @@ const NoResults = ({
   readonly hasFilters: boolean
   readonly onClear: () => void
 }) => (
-  <section className={panelClass}>
+  <Card className={panelClass}>
+    <CardContent className="p-8 text-center">
     <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
       {hasFilters ? "Nothing filed under these terms" : "No sessions captured"}
     </p>
@@ -44,15 +46,17 @@ const NoResults = ({
         : "Captured sessions will appear here once they are available to you."}
     </p>
     {hasFilters ? (
-      <button type="button" onClick={onClear} className={primaryButton}>
+      <Button type="button" onClick={onClear} className={primaryButtonClass}>
         Clear filters
-      </button>
+      </Button>
     ) : null}
-  </section>
+    </CardContent>
+  </Card>
 )
 
 const Denied = ({ onReset }: { readonly onReset: () => void }) => (
-  <section className="border border-stamp/40 bg-panel p-8 text-center">
+  <Card className="border-stamp/40 bg-panel p-8 text-center">
+    <CardContent className="p-0 text-center">
     <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
       Access withheld
     </p>
@@ -60,10 +64,11 @@ const Denied = ({ onReset }: { readonly onReset: () => void }) => (
     <p className="mx-auto mt-2 max-w-md text-ink-soft">
       It either does not exist or has not been shared with you.
     </p>
-    <button type="button" onClick={onReset} className={primaryButton}>
+    <Button type="button" onClick={onReset} className={primaryButtonClass}>
       Back to all sessions
-    </button>
-  </section>
+    </Button>
+    </CardContent>
+  </Card>
 )
 
 const ErrorState = ({ error }: { readonly error: ApiError }) => {
@@ -82,8 +87,8 @@ const ErrorState = ({ error }: { readonly error: ApiError }) => {
   ]).has(error.code ?? "")
   const ambiguous = error.code === "ambiguousCommit"
   return (
-    <section className="border border-err/40 bg-panel p-6" role="alert">
-      <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
+    <Card className="border-err/40 bg-panel p-6" role="alert">
+      <CardContent className="p-0">      <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
         {ambiguous
           ? "Commit prefix is ambiguous"
           : invalid
@@ -97,7 +102,8 @@ const ErrorState = ({ error }: { readonly error: ApiError }) => {
             ? "The search or filter format is not valid. Update it and try again."
             : error.message}
       </p>
-    </section>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -161,14 +167,15 @@ const Pagination = ({
       className="mt-3 grid grid-cols-2 items-center gap-2 border-t border-rule pt-3 min-[600px]:grid-cols-[1fr_auto_1fr]"
       aria-label="Search results pagination"
     >
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={() => onPage(page - 1)}
         disabled={page <= 1}
-        className="h-9 rounded-xs border border-ink bg-panel-2 px-3 font-semibold disabled:cursor-not-allowed disabled:border-rule disabled:bg-panel disabled:text-faded min-[600px]:justify-self-start"
+        className="min-[600px]:justify-self-start"
       >
         Previous
-      </button>
+      </Button>
       <p className="col-span-2 row-start-1 text-center min-[600px]:col-span-1 min-[600px]:col-start-2">
         <strong className="block text-[0.75rem]">
           Page {page} of {Math.max(totalPages, 1)}
@@ -177,14 +184,15 @@ const Pagination = ({
           Showing {first}–{last} of {total} sessions
         </span>
       </p>
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={() => onPage(page + 1)}
         disabled={totalPages === 0 || page >= totalPages}
-        className="h-9 rounded-xs border border-ink bg-panel-2 px-3 font-semibold disabled:cursor-not-allowed disabled:border-rule disabled:bg-panel disabled:text-faded min-[600px]:col-start-3 min-[600px]:justify-self-end"
+        className="min-[600px]:col-start-3 min-[600px]:justify-self-end"
       >
         Next
-      </button>
+      </Button>
     </nav>
   )
 }

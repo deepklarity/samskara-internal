@@ -2,6 +2,7 @@ import { Link } from "react-router-dom"
 import { repoLabel } from "../api/repo.js"
 import type { SearchSourceKind, SessionSummary } from "../api/types.js"
 import { absoluteTime, relativeTime } from "../time.js"
+import { Badge } from "./ui/badge.js"
 
 const Unavailable = () => (
   <span className="text-faded italic underline decoration-dotted">unavailable</span>
@@ -107,27 +108,29 @@ export const SessionRow = ({ session, to, showProject = true }: Props) => {
         <span className="block truncate text-[0.875rem] font-semibold">
           {title ?? <span className="text-faded italic">untitled session</span>}
           {session.hasAiReview ? (
-            <span className="ml-1.5 inline-flex items-center rounded-xs border border-rule px-1.5 py-px align-middle font-mono text-[0.62rem] font-semibold uppercase tracking-[0.06em] text-ink-soft">
+            <Badge variant="outline" className="ml-1.5 px-1.5 py-px align-middle font-mono text-[0.62rem] uppercase tracking-[0.06em] text-ink-soft">
               AI review
-            </span>
+            </Badge>
           ) : null}
         </span>
         <span className="block truncate font-mono text-[0.72rem] text-ink-soft">
           {userLogin} · {repo === null ? null : `${repoLabel(repo)} · `}
           {durationMs === null ? <Unavailable /> : formatDuration(durationMs)} ·{" "}
-          <span
+          <Badge
+            variant="outline"
             title={`size ${bucket} · ${formatTokens(tokensTotal)} total`}
-            className="inline-flex items-center rounded-xs border border-rule px-1 py-px font-semibold"
+            className="bg-panel px-1 py-px font-sans not-italic"
           >
             {bucket}
-          </span>
+          </Badge>
           {isLongSession(durationMs) ? (
-            <span
+            <Badge
+              variant="outline"
               title={`long session · ${formatDuration(durationMs as number)}`}
-              className="ml-1 inline-flex items-center rounded-xs border border-rule px-1 py-px font-semibold"
+              className="ml-1 bg-panel px-1 py-px font-sans not-italic"
             >
               Long
-            </span>
+            </Badge>
           ) : null}
         </span>
         <span className="mt-0.5 flex flex-col font-mono text-[0.68rem] leading-4 text-faded">

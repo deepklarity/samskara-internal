@@ -24,6 +24,9 @@ const session: SessionSummary = {
   repo: null,
   durationMs: 900_000,
   tokensTotal: 4200,
+  tokensInput: 0,
+  tokensOutput: 0,
+  tokensCached: 0,
   status: "complete",
   lastActiveAt: "2026-02-01T09:30:00.000Z",
   hasAiReview: false,
@@ -397,12 +400,13 @@ test("SC15: the sessions page renders each row the inferred list payload returns
   const firstRow = await screen.findByRole("link", { name: /port the session detail surface/i })
   expect(firstRow).toHaveTextContent("Samskara")
   expect(firstRow).toHaveTextContent("maya")
-  expect(firstRow).toHaveTextContent("4.2k tokens")
+  expect(firstRow).toHaveTextContent("Small")
+  expect(firstRow).toHaveTextContent("↑ ")
 
   const secondRow = screen.getByRole("link", { name: /trim the ingest pipeline/i })
   expect(secondRow).toHaveTextContent("Andromeda")
   expect(secondRow).toHaveTextContent("ravi")
-  expect(secondRow).toHaveTextContent("12.4M tokens")
+  expect(secondRow).toHaveTextContent("Very large")
   expect(secondRow).toHaveTextContent("unavailable")
 })
 

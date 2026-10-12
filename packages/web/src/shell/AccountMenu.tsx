@@ -5,6 +5,7 @@ import { logout } from "../api/account.js"
 import type { ApiError } from "../api/client.js"
 import type { CurrentUser } from "../api/types.js"
 import { useAuth } from "../auth/AuthProvider.js"
+import { Button } from "../components/ui/button.js"
 
 const ITEM_CLASS =
   "block w-full px-3 py-2 text-left text-[0.78rem] hover:bg-panel focus:bg-panel focus-visible:outline-none"
@@ -100,17 +101,18 @@ export const AccountMenu = ({ user }: { user: CurrentUser }) => {
 
   return (
     <div ref={containerRef} className="relative shrink-0">
-      <button
+      <Button
         ref={triggerRef}
         type="button"
+        variant="outline"
         aria-label="Account menu"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
-        className="border border-rule bg-panel-2 px-3 py-1.5 font-mono text-[0.78rem] text-ink-soft max-sm:max-w-[45vw] max-sm:truncate"
+        className="font-mono text-[0.78rem] text-ink-soft max-sm:max-w-[45vw] max-sm:truncate"
       >
         <span className="text-custody">signed in</span> / {user.githubLogin}
-      </button>
+      </Button>
 
       {open ? (
         <div

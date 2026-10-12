@@ -65,6 +65,26 @@
   --animate-file-in: file-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* shadcn theme tokens mapped 1:1 onto the existing palette -- same hexes, no look change. */
+@theme {
+  --color-background: #eaedf1;
+  --color-foreground: #1a1c20;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a1c20;
+  --color-primary: #2b4a78;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f4f6f8;
+  --color-secondary-foreground: #2f343c;
+  --color-muted: #f4f6f8;
+  --color-muted-foreground: #5b616b;
+  --color-border: #b0b9c6;
+  --color-destructive: #9e2a2b;
+  --color-destructive-foreground: #ffffff;
+  --radius-lg: 3px;
+  --radius-md: 3px;
+  --radius-sm: 2px;
+}
+
 @keyframes file-in {
   from {
     opacity: 0;

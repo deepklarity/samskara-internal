@@ -40,6 +40,10 @@ import { SessionExpired } from "../auth/SessionExpired.js"
 import { AnalyzeDialog } from "../components/AnalyzeDialog.js"
 import { RepoLink } from "../components/RepoLink.js"
 import { controlClass, labelClass } from "../components/TextField.js"
+import { Badge } from "../components/ui/badge.js"
+import { Button } from "../components/ui/button.js"
+import { Card, CardContent, CardHeader } from "../components/ui/card.js"
+import { Progress } from "../components/ui/progress.js"
 import { AgentRail, agentEntries } from "../session/AgentRail.js"
 import { ArtifactsView } from "../session/ArtifactsView.js"
 import { CommitsView, PullRequestsView } from "../session/ChangesView.js"
@@ -666,9 +670,9 @@ const compactCount = (value: number): string => {
 }
 
 const MetaChip = ({ children }: { children: React.ReactNode }) => (
-  <span className="rounded-xs border border-rule bg-panel-2 px-1.5 py-0.5 tabular-nums">
+  <Badge variant="secondary" className="tabular-nums font-mono">
     {children}
-  </span>
+  </Badge>
 )
 
 // The numbers the server computed from the export — never the reviewer's own estimates.
@@ -889,15 +893,8 @@ const TimelineEntryRow = ({
           {meta}
         </span>
         {pct === null ? null : (
-          <span
-            aria-hidden="true"
-            className="mt-1.5 block h-1.5 w-full overflow-hidden rounded-full border border-rule-soft bg-panel-2"
-          >
-            <span
-              title={`${pct}% of timeline`}
-              className={`block h-full rounded-full ${railDotOf(entry.kind, tone)}`}
-              style={{ width: `${pct}%` }}
-            />
+          <span title={`${pct}% of timeline`} style={{ width: `${pct}%` }} className="mt-1.5 block">
+            <Progress value={pct} aria-hidden="true" className="h-1.5 border border-rule-soft" />
           </span>
         )}
         <span className="mt-1 block text-[0.82rem] text-ink-soft">
@@ -957,11 +954,9 @@ const TimelineSection = ({
 }
 
 const Chip = ({ tone, children }: { tone: string; children: React.ReactNode }) => (
-  <span
-    className={`inline-flex items-center rounded-xs border px-2 py-0.5 font-mono text-[0.72rem] font-semibold uppercase tracking-[0.06em] ${tone}`}
-  >
+  <Badge variant="outline" className={tone}>
     {children}
-  </span>
+  </Badge>
 )
 
 const SEVERITY_TONE: Readonly<Record<string, string>> = {
@@ -1520,188 +1515,194 @@ const AiReviewCard = ({
   const [logOpen, setLogOpen] = useState(false)
 
   return (
-    <article className="border border-rule bg-panel p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-xs border border-rule px-2 py-0.5 font-mono text-[0.72rem] text-ink-soft">
+    <Card className="bg-panel p-4">
+      <CardHeader className="flex-row flex-wrap items-center gap-2 p-0">
+        <Badge variant="outline" className="font-mono">
           {review.analyzer === "ai-v2" ? "Code-aware AI review" : "AI review"}
-        </span>
+        </Badge>
         <span className="font-mono text-[0.72rem] text-faded">
           Analyzed {absoluteTime(review.analyzedAt ?? review.createdAt)}
         </span>
-        <button
+        <Button
           ref={redoRef}
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => setRedoOpen(true)}
           disabled={analysis.phase === "running"}
-          className="ml-auto rounded-xs border border-rule px-2 py-0.5 font-mono text-[0.72rem] text-ink-soft transition-colors hover:border-ink-soft hover:bg-panel-2 disabled:opacity-60"
+          className="ml-auto font-mono"
         >
           {analysis.phase === "running" ? "Redo running…" : "Redo review"}
-        </button>
-      </div>
-      <Verdict outcome={review.outcome} friction={review.friction} />
-      {signals === null ? null : (
-        <p className="mt-1.5 font-mono text-[0.72rem] text-ink-soft">
-          {signals.model} · {signals.harness}
-        </p>
-      )}
-      {/* A redo's state would otherwise be invisible: the analyze section only renders when
-       * no review exists, so every redo phase has to surface here, on the card itself. */}
-      {analysis.phase === "running" ? (
-        <p className="mt-1.5 font-mono text-[0.72rem] text-ink-soft">
-          Redo running… (started {absoluteTime(analysis.startedAt)})
-        </p>
-      ) : null}
-      {analysis.phase === "failed" ? (
-        <p role="alert" className="mt-1.5 text-[0.82rem] text-err">
-          Redo failed — {analysis.message} You can try again.
-        </p>
-      ) : null}
-      {analysis.phase === "forbidden" ? (
-        <p className="mt-1.5 text-[0.82rem] text-ink-soft">
-          You need edit rights on this project to run an AI review.
-        </p>
-      ) : null}
-      {analysis.phase === "congested" ? (
-        <p className="mt-1.5 text-[0.82rem] text-ink-soft">
-          The server is running 4 analyses already — try again in a minute.
-        </p>
-      ) : null}
-      <p className="mt-2 text-ink">{displayReviewText(review.summary)}</p>
-      {numbers === undefined ? null : <NumbersLine numbers={numbers} />}
-      {signals?.partial === undefined ? null : (
-        <PartialBanner partial={signals.partial} recovered={signals.run?.recovered ?? []} />
-      )}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-0 pt-2">
+        <Verdict outcome={review.outcome} friction={review.friction} />
+        {signals === null ? null : (
+          <p className="mt-1.5 font-mono text-[0.72rem] text-ink-soft">
+            {signals.model} · {signals.harness}
+          </p>
+        )}
+        {/* A redo's state would otherwise be invisible: the analyze section only renders when
+         * no review exists, so every redo phase has to surface here, on the card itself. */}
+        {analysis.phase === "running" ? (
+          <p className="mt-1.5 font-mono text-[0.72rem] text-ink-soft">
+            Redo running… (started {absoluteTime(analysis.startedAt)})
+          </p>
+        ) : null}
+        {analysis.phase === "failed" ? (
+          <p role="alert" className="mt-1.5 text-[0.82rem] text-err">
+            Redo failed — {analysis.message} You can try again.
+          </p>
+        ) : null}
+        {analysis.phase === "forbidden" ? (
+          <p className="mt-1.5 text-[0.82rem] text-ink-soft">
+            You need edit rights on this project to run an AI review.
+          </p>
+        ) : null}
+        {analysis.phase === "congested" ? (
+          <p className="mt-1.5 text-[0.82rem] text-ink-soft">
+            The server is running 4 analyses already — try again in a minute.
+          </p>
+        ) : null}
+        <p className="mt-2 text-ink">{displayReviewText(review.summary)}</p>
+        {numbers === undefined ? null : <NumbersLine numbers={numbers} />}
+        {signals?.partial === undefined ? null : (
+          <PartialBanner partial={signals.partial} recovered={signals.run?.recovered ?? []} />
+        )}
 
-      {entries.length === 0 ? null : (
-        <>
-          <TimeStrip entries={entries} totalMs={totalMs} failedSeqs={failedSeqs} />
-          {review.analyzer === "ai-v2" ? (
-            <details className="group mt-4 border border-rule bg-panel-2">
-              <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-semibold hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
-                Session timeline
-                <span className="font-mono text-[0.72rem] font-normal text-ink-soft">
-                  {visibleTimelineEntries(entries).length} steps
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="ml-auto text-ink-soft transition-transform group-open:rotate-180"
-                >
-                  ⌄
-                </span>
-              </summary>
-              <div className="border-t border-rule px-3 pb-3">
-                <TimelineSection
-                  entries={entries}
-                  linkFor={linkFor}
-                  totalMs={totalMs}
-                  failedSeqs={failedSeqs}
-                />
-              </div>
-            </details>
-          ) : (
-            <TimelineSection
-              entries={entries}
-              linkFor={linkFor}
-              totalMs={totalMs}
-              failedSeqs={failedSeqs}
-            />
-          )}
-        </>
-      )}
-
-      {groups.length === 0 ? null : (
-        <section className="mt-4">
-          <LensHeading>Learnings</LensHeading>
-          {groups.map((group) => (
-            <div key={group.heading} className="mt-3">
-              <h4 className="mb-1.5 text-[0.875rem] font-semibold">{group.heading}</h4>
-              <ul className="flex flex-col gap-2">
-                {group.learnings.map((learning) => (
-                  <LearningRow
-                    key={learning.title}
-                    learning={learning}
+        {entries.length === 0 ? null : (
+          <>
+            <TimeStrip entries={entries} totalMs={totalMs} failedSeqs={failedSeqs} />
+            {review.analyzer === "ai-v2" ? (
+              <details className="group mt-4 border border-rule bg-panel-2">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-semibold hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
+                  Session timeline
+                  <span className="font-mono text-[0.72rem] font-normal text-ink-soft">
+                    {visibleTimelineEntries(entries).length} steps
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="ml-auto text-ink-soft transition-transform group-open:rotate-180"
+                  >
+                    ⌄
+                  </span>
+                </summary>
+                <div className="border-t border-rule px-3 pb-3">
+                  <TimelineSection
+                    entries={entries}
                     linkFor={linkFor}
-                    lesson={lessonFor(learning)}
+                    totalMs={totalMs}
+                    failedSeqs={failedSeqs}
                   />
+                </div>
+              </details>
+            ) : (
+              <TimelineSection
+                entries={entries}
+                linkFor={linkFor}
+                totalMs={totalMs}
+                failedSeqs={failedSeqs}
+              />
+            )}
+          </>
+        )}
+
+        {groups.length === 0 ? null : (
+          <section className="mt-4">
+            <LensHeading>Learnings</LensHeading>
+            {groups.map((group) => (
+              <div key={group.heading} className="mt-3">
+                <h4 className="mb-1.5 text-[0.875rem] font-semibold">{group.heading}</h4>
+                <ul className="flex flex-col gap-2">
+                  {group.learnings.map((learning) => (
+                    <LearningRow
+                      key={learning.title}
+                      learning={learning}
+                      linkFor={linkFor}
+                      lesson={lessonFor(learning)}
+                    />
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {review.analyzer !== "ai-v2" ? null : (
+          <section className="mt-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-[1rem] font-semibold">Improvements for future sessions</h3>
+              <span className="font-mono text-[0.72rem] text-ink-soft">
+                {improvements.length} {improvements.length === 1 ? "finding" : "findings"}
+              </span>
+            </div>
+            {improvements.length === 0 ? (
+              <p className="mt-2 text-[0.82rem] text-ink-soft">
+                No reusable improvements were supported by this session’s evidence.
+              </p>
+            ) : (
+              <ul className="mt-3 flex flex-col gap-2">
+                {improvements.map((item) => (
+                  <ImprovementRow key={item.title} item={item} linkFor={linkFor} />
                 ))}
               </ul>
-            </div>
-          ))}
-        </section>
-      )}
+            )}
+            {signals?.evidence === undefined ? null : (
+              <EvidenceCoverage evidence={signals.evidence} />
+            )}
+          </section>
+        )}
 
-      {review.analyzer !== "ai-v2" ? null : (
-        <section className="mt-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="text-[1rem] font-semibold">Improvements for future sessions</h3>
-            <span className="font-mono text-[0.72rem] text-ink-soft">
-              {improvements.length} {improvements.length === 1 ? "finding" : "findings"}
-            </span>
-          </div>
-          {improvements.length === 0 ? (
-            <p className="mt-2 text-[0.82rem] text-ink-soft">
-              No reusable improvements were supported by this session’s evidence.
-            </p>
-          ) : (
-            <ul className="mt-3 flex flex-col gap-2">
-              {improvements.map((item) => (
-                <ImprovementRow key={item.title} item={item} linkFor={linkFor} />
+        {breadcrumbs.length === 0 ? null : (
+          <section className="mt-4">
+            <LensHeading>Breadcrumbs and tools worth keeping</LensHeading>
+            <ul className="flex flex-col gap-2">
+              {breadcrumbs.map((learning) => (
+                <LearningRow
+                  key={learning.title}
+                  learning={learning}
+                  linkFor={linkFor}
+                  lesson={lessonFor(learning)}
+                />
               ))}
             </ul>
-          )}
-          {signals?.evidence === undefined ? null : (
-            <EvidenceCoverage evidence={signals.evidence} />
-          )}
-        </section>
-      )}
+          </section>
+        )}
 
-      {breadcrumbs.length === 0 ? null : (
-        <section className="mt-4">
-          <LensHeading>Breadcrumbs and tools worth keeping</LensHeading>
-          <ul className="flex flex-col gap-2">
-            {breadcrumbs.map((learning) => (
-              <LearningRow
-                key={learning.title}
-                learning={learning}
-                linkFor={linkFor}
-                lesson={lessonFor(learning)}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* The reviewer's own session, rendered like the conversation tab: who said what and
-       * which tools ran, captured from its sandbox before the workspace was deleted. Falls
-       * back to the raw output tail when no structured transcript was captured. */}
-      {signals?.run?.transcript === undefined && signals?.run?.agentLog === undefined ? null : (
-        <>
-          <button
-            type="button"
-            onClick={() => setLogOpen(true)}
-            className="mt-4 rounded-xs border border-rule px-2 py-0.5 font-mono text-[0.72rem] text-ink-soft transition-colors hover:border-ink-soft hover:bg-panel-2"
-          >
-            Reviewer session
-          </button>
-          <ReviewerSessionModal
-            open={logOpen}
-            onClose={() => setLogOpen(false)}
-            transcript={signals?.run?.transcript ?? []}
-            tail={signals?.run?.agentLog}
-          />
-        </>
-      )}
-      <AnalyzeDialog
-        open={redoOpen}
-        defaultAnalyzer={review.analyzer === "ai-v2" ? "ai-v2" : "ai-v1"}
-        onClose={() => setRedoOpen(false)}
-        restoreFocusTo={() => redoRef.current}
-        onRun={(choice) => {
-          setRedoOpen(false)
-          onRedo({ ...choice, force: true })
-        }}
-      />
-    </article>
+        {/* The reviewer's own session, rendered like the conversation tab: who said what and
+         * which tools ran, captured from its sandbox before the workspace was deleted. Falls
+         * back to the raw output tail when no structured transcript was captured. */}
+        {signals?.run?.transcript === undefined && signals?.run?.agentLog === undefined ? null : (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setLogOpen(true)}
+              className="mt-4 font-mono"
+            >
+              Reviewer session
+            </Button>
+            <ReviewerSessionModal
+              open={logOpen}
+              onClose={() => setLogOpen(false)}
+              transcript={signals?.run?.transcript ?? []}
+              tail={signals?.run?.agentLog}
+            />
+          </>
+        )}
+        <AnalyzeDialog
+          open={redoOpen}
+          defaultAnalyzer={review.analyzer === "ai-v2" ? "ai-v2" : "ai-v1"}
+          onClose={() => setRedoOpen(false)}
+          restoreFocusTo={() => redoRef.current}
+          onRun={(choice) => {
+            setRedoOpen(false)
+            onRedo({ ...choice, force: true })
+          }}
+        />
+      </CardContent>
+    </Card>
   )
 }
 
@@ -1725,15 +1726,16 @@ const AnalyzeSection = ({
   return (
     <section className="border border-dashed border-rule bg-panel p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <button
+        <Button
           ref={buttonRef}
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => setDialogOpen(true)}
           disabled={running}
-          className="rounded-xs border border-rule px-2 py-0.5 text-ink-soft transition-colors hover:border-ink-soft hover:bg-panel disabled:cursor-default disabled:opacity-60 disabled:hover:border-rule disabled:hover:bg-transparent"
         >
           Analyze with AI
-        </button>
+        </Button>
         {analysis.phase === "running" ? (
           <span className="font-mono text-[0.72rem] text-ink-soft">
             Analyzing… (started {absoluteTime(analysis.startedAt)})
@@ -1981,19 +1983,21 @@ const ReviewPanel = ({
           {(["ai-v1", "ai-v2"] as const).map((analyzer) => {
             const exists = analyzer === "ai-v1" ? standard !== null : codeAware !== null
             return (
-              <button
+              <Button
                 key={analyzer}
                 type="button"
+                variant={ai?.analyzer === analyzer ? "secondary" : "outline"}
+                size="sm"
                 disabled={!exists && analysis.phase === "running"}
                 aria-pressed={ai?.analyzer === analyzer}
                 onClick={() =>
                   exists ? setSelectedAnalyzer(analyzer) : setMissingAnalyzer(analyzer)
                 }
-                className="rounded-xs border border-rule px-2 py-1 font-mono text-[0.72rem] text-ink-soft hover:bg-panel-2 disabled:opacity-60"
+                className="font-mono"
               >
                 {analyzer === "ai-v1" ? "Standard review" : "Code-aware review"}
                 {exists ? "" : " · Run"}
-              </button>
+              </Button>
             )
           })}
         </fieldset>
