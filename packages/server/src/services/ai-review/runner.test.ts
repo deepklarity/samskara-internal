@@ -16,6 +16,8 @@ import {
   createClaudeRunner,
   createMsbWrappedRunner,
   createOpencodeRunner,
+  MSB_REVIEW_LABEL,
+  reapStaleReviewSandboxes,
 } from "./runner.js"
 
 const log = () => createLogger({ service: "samskara-server-test" }, { level: "silent" })
@@ -322,6 +324,9 @@ describe("createMsbWrappedRunner", () => {
     expect(argv).toContain(`${workspaceDir}:/work`)
     expect(argv).toContain(`${codeDir}:/code:ro`)
     expect(argv).not.toContain(`${codeDir}:/code`)
+    // Labelled for crash-orphan reaping: every review sandbox carries it.
+    expect(argv).toContain("--label")
+    expect(argv).toContain(`${MSB_REVIEW_LABEL}=true`)
     expect(JSON.parse(readFileSync(`${capturePath}.cleanup`, "utf8"))).toEqual([
       "remove",
       "--force",
@@ -669,4 +674,22 @@ describe("createMsbWrappedRunner", () => {
       )
     },
   )
+
+  test("MR9: reapStaleReviewSandboxes removes by label, and a missing msb only warns", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-reap-test-"))
+    const capturePath = join(workspaceDir, "captured.json")
+    const fakeMsb = writeFakeMsb(workspaceDir, capturePath)
+
+    await reapStaleReviewSandboxes(fakeMsb, log())
+    expect(JSON.parse(readFileSync(`${capturePath}.cleanup`, "utf8"))).toEqual([
+      "remove",
+      "--force",
+      "--quiet",
+      "--label",
+      `${MSB_REVIEW_LABEL}=true`,
+    ])
+
+    // msb absent (CI): resolves, never rejects.
+    await reapStaleReviewSandboxes(join(workspaceDir, "no-such-msb"), log())
+  })
 })

@@ -354,6 +354,9 @@ const MSB_SANDBOX_PREFIX = "samskara-ai-review-"
 const execFileAsync = promisify(execFile)
 
 /** Removing stopped review VMs is best-effort bookkeeping; it must not erase a review result. */
+/** Label on every review sandbox: crash-orphans are identifiable and reaped by label. */
+export const MSB_REVIEW_LABEL = "samskara-ai-review"
+
 const removeMsbSandbox = async (
   command: string,
   sandboxName: string,
@@ -420,6 +423,8 @@ export const buildMsbArgs = (input: BuildMsbArgsInput): string[] => {
     `${msbTimeoutSec}s`,
     "--name",
     input.sandboxName,
+    "--label",
+    `${MSB_REVIEW_LABEL}=true`,
     "-m",
     `${input.memoryMb}M`,
     "-v",
@@ -508,6 +513,29 @@ const readFailedMsbTrace = async (
   }
 }
 
+/**
+ * Reap review sandboxes orphaned by an earlier server (crash or restart mid-run): the
+ * per-run `finally` never fired for them, so without this their VM disks accumulate
+ * under ~/.microsandbox forever. Safe at startup because the job registry is in-memory
+ * — no review can be running yet. Best-effort: msb missing (CI) only logs.
+ */
+export const reapStaleReviewSandboxes = async (
+  msbBin: string,
+  log: pino.Logger,
+): Promise<void> => {
+  try {
+    await execFileAsync(msbBin, ["remove", "--force", "--quiet", "--label", `${MSB_REVIEW_LABEL}=true`], {
+      timeout: 30_000,
+      maxBuffer: 64 * 1024,
+    })
+    log.info("reaped stale ai review sandboxes")
+  } catch (error) {
+    log.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      "could not reap stale ai review sandboxes",
+    )
+  }
+}
 /**
  * Spawns `msb run` with the workspace mounted and XDG redirected into it. The captured
  * stdout/stderr honors the same caps as the in-process runner, so a runaway VM cannot
