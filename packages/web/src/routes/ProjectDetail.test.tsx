@@ -61,6 +61,61 @@ test("SC1: a project page shows the project's name, slug, owner and session coun
   )
 })
 
+test("SC1b: every project session is listed, not just the first few", async () => {
+  const sessions = Array.from({ length: 24 }, (_, i) => ({
+    id: `s-${i}`,
+    title: `Session ${i}`,
+    projectId: "p-1",
+    projectName: "samskara",
+    projectSlug: "samskara",
+    userLogin: "kgritesh",
+    repo: null,
+    durationMs: 60_000,
+    tokensTotal: 1_000,
+    tokensInput: 600,
+    tokensOutput: 400,
+    tokensCached: 0,
+    status: "complete",
+    lastActiveAt: "2026-02-01T09:30:00.000Z",
+    hasAiReview: false,
+  }))
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = typeof input === "string" ? input : String(input)
+    if (url.includes("/api/projects/")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ project: PROJECT, viewerCanDelete: false }), {
+          status: 200,
+        }),
+      )
+    }
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({ sessions, pagination: { page: 1, limit: 100, total: 24 } }),
+        { status: 200 },
+      ),
+    )
+  })
+
+  const { unmount } = render(
+    <TestRouter initialEntries={["/projects/p-1"]}>
+      <Routes>
+        <Route path="/projects/:id" element={<ProjectDetail />} />
+      </Routes>
+    </TestRouter>,
+  )
+  await screen.findByRole("heading", { name: "samskara" })
+  // The first page of ten renders; the rest are one click away, never silently missing.
+  const rows = () => screen.getAllByRole("listitem").filter((item) => item.textContent !== "")
+  await waitFor(() => expect(rows()).toHaveLength(10))
+  expect(rows()[0]?.textContent).toContain("Session 0")
+  const more = screen.getByRole("button", { name: /show more/i })
+  expect(more).toHaveTextContent("14 remaining")
+  more.click()
+  await waitFor(() => expect(rows()).toHaveLength(24))
+  expect(rows()[23]?.textContent).toContain("Session 23")
+  unmount()
+})
+
 test("SC2: the owner line follows who owns the project - org slug marked as an org, user login not marked", async () => {
   const { unmount } = renderDetail({
     ...PROJECT,

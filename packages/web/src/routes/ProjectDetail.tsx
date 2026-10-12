@@ -50,6 +50,7 @@ export const ProjectDetail = () => {
   const [state, setState] = useState<State>({ phase: "loading" })
   const [deleting, setDeleting] = useState(false)
   const [recent, setRecent] = useState<ReadonlyArray<SessionSummary> | null>(null)
+  const [shownCount, setShownCount] = useState(10)
   const deleteTriggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -77,8 +78,9 @@ export const ProjectDetail = () => {
     if (!id) return
     let active = true
 
+    // Load enough that "show more" reveals the whole project; the API pages at 100.
     request(() =>
-      client.api.sessions.$get({ query: { project: id, sort: "recent", limit: "5" } }),
+      client.api.sessions.$get({ query: { project: id, sort: "recent", limit: "100" } }),
     ).then((result) => {
       if (!active) return
       setRecent(result.ok ? result.data.sessions : [])
@@ -113,13 +115,13 @@ export const ProjectDetail = () => {
         <Field label="Sessions">{project.sessionCount}</Field>
       </div>
       <div className="mt-6 flex items-baseline justify-between gap-4">
-        <h2 className="text-[0.9375rem] font-semibold">Recent sessions</h2>
+        <h2 className="text-[0.9375rem] font-semibold">Sessions</h2>
         {project.sessionCount > 0 ? (
           <Link
             to={`/sessions?project=${encodeURIComponent(project.id)}`}
             className="text-[0.78rem] font-semibold text-custody hover:underline"
           >
-            All {project.sessionCount} sessions
+            Filter &amp; search these sessions
           </Link>
         ) : null}
       </div>
@@ -133,17 +135,28 @@ export const ProjectDetail = () => {
           recording sessions.
         </p>
       ) : (
-        <ul className="mt-2 flex flex-col gap-2">
-          {recent.map((session) => (
-            <li key={session.id}>
-              <SessionRow
-                session={session}
-                to={`/sessions/${encodeURIComponent(session.id)}`}
-                showProject={false}
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="mt-2 flex flex-col gap-2">
+            {recent.slice(0, shownCount).map((session) => (
+              <li key={session.id}>
+                <SessionRow
+                  session={session}
+                  to={`/sessions/${encodeURIComponent(session.id)}`}
+                  showProject={false}
+                />
+              </li>
+            ))}
+          </ul>
+          {recent.length > shownCount ? (
+            <button
+              type="button"
+              onClick={() => setShownCount((count) => count + 20)}
+              className="mt-3 w-full border border-rule bg-panel-2 px-4 py-2 text-[0.82rem] font-semibold text-ink-soft hover:border-ink-soft hover:text-ink"
+            >
+              Show more ({recent.length - shownCount} remaining)
+            </button>
+          ) : null}
+        </>
       )}
 
       {viewerCanDelete ? (
