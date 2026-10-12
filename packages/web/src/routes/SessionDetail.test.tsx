@@ -1531,13 +1531,11 @@ test("AI review: an old-shape ai-v1 row renders its verdict sentence, audience g
   expect(entry).toHaveAttribute("href", expect.stringContaining("m=m-3"))
 
   // Learnings group under audience headers; an empty group is skipped, not announced.
+  // Detail and evidence render inline with no click.
   expect(
     within(panel).getByRole("heading", { name: "What you could do differently" }),
   ).toBeInTheDocument()
   expect(within(panel).queryByRole("heading", { name: "The agent" })).not.toBeInTheDocument()
-  await user.click(
-    within(panel).getByRole("button", { name: /name the constraint in the prompt/i }),
-  )
   const evidence = within(panel).getByRole("link", { name: /seq 1 · prompt names no table/ })
   expect(evidence).toHaveAttribute("href", expect.stringContaining("tab=conversation"))
   expect(evidence).toHaveAttribute("href", expect.stringContaining("m=m-2"))
@@ -1989,7 +1987,7 @@ test("AI-9c: where the time went — a proportional strip with titled segments a
     "bg-stamp",
   )
   expect(
-    within(panel).getByText(/95s of 278s — 34% — went to Recovering the missing export/),
+    within(panel).getByText(/95s of 184s — 52% — went to Recovering the missing export/),
   ).toBeInTheDocument()
 })
 
@@ -2003,8 +2001,10 @@ test("AI-9c: timeline rows show duration + seq range, and the whole row navigate
   await user.click(screen.getByRole("tab", { name: /Review/ }))
 
   const panel = panelOf()
-  const meta = within(panel).getByText(/95s · 34% of the session/)
+  const meta = within(panel).getByText(/95s · 52% of timeline/)
   expect(meta.textContent).toContain("seq 3–28")
+  // startMs is an epoch timestamp server-side, not an offset: never render it as one.
+  expect(meta.textContent).not.toMatch(/starts/)
   const row = within(panel).getByRole("link", { name: /recovering the missing export/i })
   expect(row).toHaveAttribute("href", expect.stringContaining("tab=conversation"))
   expect(row).toHaveAttribute("href", expect.stringContaining("m=m-3"))
@@ -2037,7 +2037,7 @@ test("AI-9c: the whole timeline renders, however long it is", async () => {
   expect(within(panelOf()).queryByRole("button", { name: /show all/i })).not.toBeInTheDocument()
 })
 
-test("AI-9c: learnings accordions under the three audience headers, with severity, cost, next time, and evidence", async () => {
+test("AI-9c: learnings render under the three audience headers with severity, cost, detail, next time, and evidence inline — no click needed", async () => {
   const user = userEvent.setup()
   renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
     review: { status: 200, body: { reviews: [ENRICHED_AI_REVIEW] } },
@@ -2054,27 +2054,22 @@ test("AI-9c: learnings accordions under the three audience headers, with severit
     within(panel).getByRole("heading", { name: "What the agent could do better" }),
   ).toBeInTheDocument()
 
-  // The always-visible level carries the severity chip and the cost; the rest stays folded.
-  const harnessRow = within(panel).getByRole("button", {
-    name: /exporter delivered an empty promise/i,
-  })
+  // Detail, the imperative next-time line, and evidence deep links are visible
+  // without expanding anything: learnings are not accordions.
+  const harnessRow = within(panel)
+    .getByText(/exporter delivered an empty promise/i)
+    .closest("li") as HTMLElement
   expect(within(harnessRow).getByText("high")).toBeInTheDocument()
   expect(within(harnessRow).getByText("95s of 278s — 34% of the session")).toBeInTheDocument()
-  expect(within(harnessRow).queryByText(/Assert the export exists/)).not.toBeInTheDocument()
-  expect(harnessRow).toHaveAttribute("aria-expanded", "false")
-
-  // Expanding reveals the detail, the imperative next-time line, and evidence deep links.
-  await user.click(harnessRow)
-  expect(harnessRow).toHaveAttribute("aria-expanded", "true")
-  const opened = harnessRow.closest("li") as HTMLElement
+  expect(within(harnessRow).queryByRole("button")).not.toBeInTheDocument()
   expect(
-    within(opened).getByText(/session\.json never landed in the workspace\./),
+    within(harnessRow).getByText(/session\.json never landed in the workspace\./),
   ).toBeInTheDocument()
   expect(
-    within(opened).getByText(/Assert the export exists before spawning the reviewer\./),
+    within(harnessRow).getByText(/Assert the export exists before spawning the reviewer\./),
   ).toBeInTheDocument()
-  expect(within(opened).getByText("Next time:")).toBeInTheDocument()
-  const evidence = within(opened).getByRole("link", { name: /seq 4 · first failed read/ })
+  expect(within(harnessRow).getByText("Next time:")).toBeInTheDocument()
+  const evidence = within(harnessRow).getByRole("link", { name: /seq 4 · first failed read/ })
   expect(evidence).toHaveAttribute("href", expect.stringContaining("tab=conversation"))
   expect(evidence).toHaveAttribute("href", expect.stringContaining("m=m-4"))
 
@@ -2086,6 +2081,92 @@ test("AI-9c: learnings accordions under the three audience headers, with severit
     .closest("li") as HTMLElement
   expect(within(nothing).queryByRole("button")).not.toBeInTheDocument()
   expect(within(nothing).queryByText(/^(low|medium|high)$/)).not.toBeInTheDocument()
+})
+
+test("AI-9c: timeline rows render a tone dot on a vertical rail plus a proportional segment bar", async () => {
+  const user = userEvent.setup()
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [ENRICHED_AI_REVIEW] } },
+  })
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+
+  const list = screen.getByRole("list", { name: /review timeline/i })
+  // Five entries, one dot each; the turning point reads accented.
+  expect(within(list).getAllByTestId("timeline-dot")).toHaveLength(5)
+  // Bar widths are shares of the entries' own 184s total: 95s renders at 52%.
+  const bar = within(list).getByTitle("52% of timeline")
+  expect(bar.getAttribute("style")).toContain("width: 52%")
+})
+
+test("AI-9c: the AI card folds curation status into each learning, so no separate lessons section renders", async () => {
+  const user = userEvent.setup()
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [ENRICHED_AI_REVIEW] } },
+    learnings: {
+      status: 200,
+      body: {
+        learnings: [
+          {
+            id: "les-1",
+            title: "Escalate before swapping the source of truth",
+            audience: "agent",
+            category: "approach",
+            status: "accepted",
+            occurrenceCount: 2,
+          },
+        ],
+      },
+    },
+  })
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+
+  const panel = panelOf()
+  expect(
+    within(panel).queryByRole("heading", { name: /lessons from this session/i }),
+  ).not.toBeInTheDocument()
+  const row = within(panel)
+    .getByText(/escalate before swapping the source of truth/i)
+    .closest("li") as HTMLElement
+  expect(within(row).getByText(/seen 2 times/)).toBeInTheDocument()
+})
+
+test("M2: on narrow viewports the session title wraps instead of truncating mid-word", async () => {
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1")
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  const heading = screen.getByRole("heading", { level: 1 })
+  expect(heading.className).toContain("max-sm:whitespace-normal")
+})
+
+test("M3: on narrow viewports the Started fact spans both stat columns so its timestamp never wraps cramped", async () => {
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1")
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  const facts = screen.getByRole("group", { name: /session facts/i })
+  const started = within(facts).getByText("Started").closest("div")?.parentElement
+  expect(started?.className).toContain("col-span-2")
+})
+
+test("M4: on narrow viewports evidence chips scroll as one horizontal row instead of stacking into wrapped columns", async () => {
+  const user = userEvent.setup()
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [ENRICHED_AI_REVIEW] } },
+  })
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+
+  const panel = panelOf()
+  const harnessRow = within(panel)
+    .getByText(/exporter delivered an empty promise/i)
+    .closest("li") as HTMLElement
+  const chips = harnessRow.querySelector("ul")
+  expect(chips?.className).toContain("max-sm:flex-nowrap")
+  expect(chips?.className).toContain("max-sm:overflow-x-auto")
 })
 
 test("AI-9c: when entries fall out of the reviewer's report, the banner names them with reasons", async () => {

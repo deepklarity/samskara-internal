@@ -57,8 +57,8 @@ import {
   toDetail,
 } from "../session/records.js"
 import { type Tab, type TabId, Tabs } from "../session/Tabs.js"
-import { failedSeqsOf, timelineTone } from "../session/timelineTone.js"
 import { ToolCallsView } from "../session/ToolCallsView.js"
+import { failedSeqsOf, timelineTone } from "../session/timelineTone.js"
 import { LoadingShell } from "../shell/LoadingShell.js"
 import { absoluteTime } from "../time.js"
 
@@ -260,7 +260,7 @@ const SessionHead = ({
       <div className="flex items-start gap-2">
         <h1
           title={session.title ?? undefined}
-          className="max-w-[62ch] truncate text-[1.375rem] font-semibold leading-tight"
+          className="max-w-[62ch] truncate text-[1.375rem] font-semibold leading-tight max-sm:whitespace-normal"
         >
           {session.title ?? <span className="text-faded italic">untitled session</span>}
         </h1>
@@ -319,10 +319,14 @@ const Masthead = ({ session, tokens }: { session: SessionFacts; tokens: TokenTot
       aria-label="Session facts"
       className="mt-4 grid w-fit max-w-full grid-cols-2 gap-x-6 gap-y-3 border-t border-rule pt-3 min-[560px]:grid-cols-3 min-[900px]:grid-cols-4 min-[1200px]:grid-cols-7"
     >
-      <Fact
-        label="Started"
-        value={session.startedAt === null ? <Unavailable /> : absoluteTime(session.startedAt)}
-      />
+      {/* The timestamp is the longest value: on narrow viewports it spans both
+      columns instead of wrapping cramped inside one. */}
+      <div className="col-span-2 min-[560px]:col-span-1">
+        <Fact
+          label="Started"
+          value={session.startedAt === null ? <Unavailable /> : absoluteTime(session.startedAt)}
+        />
+      </div>
       <Fact
         label="Duration"
         value={session.durationMs === null ? <Unavailable /> : formatDuration(session.durationMs)}
@@ -747,7 +751,9 @@ const PartialBanner = ({
 }
 
 // One horizontal bar, proportional to the entries' own durations; a turning point is the
-// accent, everything else neutral. The sentence names the largest share of the session.
+// accent, everything else neutral. The sentence names the largest share of the tracked
+// timeline spans — not of the wall-clock session, which is mostly idle between records
+// and would round every entry down to a meaningless "1% of the session".
 // The bar is colored by what happened: failures read error, slow stretches
 // warning; clean stretches keep the kind color (turning points stay accented).
 const STRIP_TONE: Readonly<Record<string, string | null>> = {
@@ -760,6 +766,11 @@ const STRIP_SEGMENT: Readonly<Record<AiTimelineEntryKind, string>> = {
   event: "bg-faded",
   "turning-point": "bg-stamp",
 }
+
+// The entries' own summed durations: the only denominator their shares are honest
+// against, since the wall-clock session total dwarfs every span.
+const activeTimelineMs = (entries: ReadonlyArray<AiTimelineEntry>): number =>
+  entries.reduce((sum, entry) => sum + (entry.durationMs ?? 0), 0)
 
 const TimeStrip = ({
   entries,
@@ -778,8 +789,8 @@ const TimeStrip = ({
     if (largest === null || (entry.durationMs ?? 0) > (largest.durationMs ?? 0)) largest = entry
   }
   const share =
-    largest !== null && totalMs > 0
-      ? `${formatSeconds(largest.durationMs ?? 0)} of ${formatSeconds(totalMs)} — ${Math.round(((largest.durationMs ?? 0) / totalMs) * 100)}% — went to ${displayReviewText(largest.title)}`
+    largest !== null && segmentTotal > 0
+      ? `${formatSeconds(largest.durationMs ?? 0)} of ${formatSeconds(segmentTotal)} — ${Math.round(((largest.durationMs ?? 0) / segmentTotal) * 100)}% — went to ${displayReviewText(largest.title)}`
       : null
   return (
     <section className="mt-4">
@@ -788,7 +799,9 @@ const TimeStrip = ({
         {timed.map((entry) => (
           <div
             key={entry.id}
-            className={STRIP_TONE[timelineTone(entry, failedSeqs, totalMs)] ?? STRIP_SEGMENT[entry.kind]}
+            className={
+              STRIP_TONE[timelineTone(entry, failedSeqs, totalMs)] ?? STRIP_SEGMENT[entry.kind]
+            }
             style={{ width: `${((entry.durationMs ?? 0) / segmentTotal) * 100}%` }}
             title={`${displayReviewText(entry.title)} · ${formatSeconds(entry.durationMs ?? 0)}`}
           />
@@ -814,13 +827,16 @@ const displayReviewText = (value: string): string =>
     .replace(/\s+([,;:.!?])/g, "$1")
     .trim()
 
-// A stretch of work is a filled circle, an occurrence a square, the moment things turned
-// a diamond — the glyph is the kind, the color marks the turn.
-const TIMELINE_KIND_MARKER: Readonly<Record<AiTimelineEntryKind, string>> = {
-  phase: "● text-ink-soft",
-  event: "■ text-faded",
-  "turning-point": "◆ text-stamp",
+// The rail: one vertical line, one dot per entry. The dot is the tone when the entry
+// needs attention (failure/slow), else the kind color — so the rail reads as a health
+// strip and the turning points still stand out. Each row also carries its own segment
+// bar, proportional to the entry's share of the tracked timeline spans.
+const RAIL_DOT_TONE: Readonly<Record<string, string>> = {
+  failure: "bg-err",
+  slow: "bg-warn",
 }
+const railDotOf = (kind: AiTimelineEntryKind, tone: string): string =>
+  RAIL_DOT_TONE[tone] ?? (kind === "turning-point" ? "bg-stamp" : "bg-faded")
 
 /** How many timeline rows render before the "show all" toggle takes over. */
 const visibleTimelineEntries = (
@@ -829,42 +845,41 @@ const visibleTimelineEntries = (
 
 // The whole row is the link: the owner asked for navigation from the timeline itself, not
 // just from the evidence chips, so the row rides the same ?m=+tab machinery they use.
-const TONE_MARKER: Readonly<Record<string, string>> = {
-  good: "",
-  failure: "text-err",
-  slow: "text-warn",
-}
 const TimelineEntryRow = ({
   entry,
   href,
-  totalMs,
+  activeMs,
   tone,
 }: {
   entry: AiTimelineEntry
   href: GroundingHref
-  totalMs: number
+  activeMs: number
   tone: string
 }) => {
   const duration = entry.durationMs
-  const share =
-    duration !== undefined && totalMs > 0
-      ? `${Math.max(1, Math.round((duration / totalMs) * 100))}% of the session`
-      : null
+  const pct =
+    duration === undefined || activeMs <= 0
+      ? null
+      : Math.max(1, Math.round((duration / activeMs) * 100))
+  const share = pct === null ? null : `${pct}% of timeline`
+  // startMs is an epoch timestamp, not an offset into the session — rendering it as
+  // "starts Ns in" produced values like "starts 1791349327s in". No session-start
+  // epoch reaches this card, so no honest offset exists: the meta stays duration +
+  // share + seq range.
   const meta = [
     duration === undefined ? null : formatSeconds(duration),
     share,
     `seq ${entry.fromSeq}–${entry.toSeq}`,
-    entry.startMs === undefined || entry.startMs === 0
-      ? null
-      : `starts ${formatSeconds(entry.startMs)} in`,
   ]
     .filter((part): part is string => part !== null)
     .join(" · ")
   const body = (
     <>
       <span
+        data-testid="timeline-dot"
+        data-tone={tone}
         aria-hidden="true"
-        className={`mt-0.5 shrink-0 font-mono text-[0.9rem] leading-snug ${TIMELINE_KIND_MARKER[entry.kind]} ${TONE_MARKER[tone] ?? ""}`}
+        className={`absolute -left-[27px] top-4 size-3 rounded-full border-2 border-panel ${railDotOf(entry.kind, tone)}`}
       />
       <span className="min-w-0">
         <span className="block text-[0.9375rem] font-semibold leading-snug">
@@ -873,6 +888,18 @@ const TimelineEntryRow = ({
         <span className="mt-0.5 block font-mono text-[0.72rem] tabular-nums text-ink-soft">
           {meta}
         </span>
+        {pct === null ? null : (
+          <span
+            aria-hidden="true"
+            className="mt-1.5 block h-1.5 w-full overflow-hidden rounded-full border border-rule-soft bg-panel-2"
+          >
+            <span
+              title={`${pct}% of timeline`}
+              className={`block h-full rounded-full ${railDotOf(entry.kind, tone)}`}
+              style={{ width: `${pct}%` }}
+            />
+          </span>
+        )}
         <span className="mt-1 block text-[0.82rem] text-ink-soft">
           {displayReviewText(entry.summary)}
         </span>
@@ -880,7 +907,7 @@ const TimelineEntryRow = ({
     </>
   )
   return (
-    <li className="border border-rule bg-panel transition-colors hover:border-ink-soft">
+    <li className="relative border border-rule bg-panel transition-colors hover:border-ink-soft">
       {href === null ? (
         <div className="flex gap-3 p-3">{body}</div>
       ) : (
@@ -904,10 +931,14 @@ const TimelineSection = ({
   failedSeqs: ReadonlySet<number>
 }) => {
   const visible = visibleTimelineEntries(entries)
+  const activeMs = activeTimelineMs(entries)
   return (
     <section className="mt-4">
       <LensHeading>Timeline</LensHeading>
-      <ol aria-label="review timeline" className="flex flex-col gap-2">
+      <ol
+        aria-label="review timeline"
+        className="relative ml-1.5 flex flex-col gap-2 border-l-2 border-rule pl-5"
+      >
         {visible.map((entry) => {
           const firstMessageId = entry.messageIds[0]
           return (
@@ -915,7 +946,7 @@ const TimelineSection = ({
               key={entry.id}
               entry={entry}
               href={firstMessageId === undefined ? null : linkFor(firstMessageId)}
-              totalMs={totalMs}
+              activeMs={activeMs}
               tone={timelineTone(entry, failedSeqs, totalMs)}
             />
           )
@@ -945,17 +976,18 @@ const NOTHING_TO_CHANGE_PREFIX = "Nothing to change"
 
 const isNothingEntry = (title: string): boolean => title.startsWith(NOTHING_TO_CHANGE_PREFIX)
 
-// One learning, one accordion: the closed row carries severity + title + cost — the triage
-// view — and expanding reveals the situation, the imperative, and the transcript evidence.
+// One learning, one open row: severity + title + cost on the first line, then the
+// detail, the imperative next-time line, and the transcript evidence — all visible,
+// nothing to expand. A matching curated lesson folds its curation status in last.
 const LearningRow = ({
   learning,
   linkFor,
+  lesson,
 }: {
   learning: AiLearning
   linkFor: (messageId: string) => GroundingHref
+  lesson?: SessionLearning
 }) => {
-  const [open, setOpen] = useState(false)
-
   if (isNothingEntry(learning.title)) {
     return (
       <li className="border border-dashed border-rule bg-panel px-3 py-2">
@@ -965,13 +997,8 @@ const LearningRow = ({
   }
 
   return (
-    <li className="border border-rule bg-panel">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-1 p-3 text-left transition-colors hover:bg-panel-2"
-      >
+    <li className="border border-rule bg-panel p-3">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         {learning.severity === undefined ? null : (
           <Chip tone={SEVERITY_TONE[learning.severity] ?? "border-rule text-ink-soft"}>
             {learning.severity}
@@ -983,41 +1010,47 @@ const LearningRow = ({
         {learning.cost === undefined ? null : (
           <span className="font-mono text-[0.72rem] text-ink-soft">{learning.cost}</span>
         )}
-      </button>
-      {open ? (
-        <div className="border-t border-rule px-3 pb-3 pt-2">
-          <p className="text-[0.82rem] text-ink-soft">{displayReviewText(learning.detail)}</p>
-          {learning.nextTime === undefined || learning.nextTime.trim() === "" ? null : (
-            <p className="mt-1.5 text-[0.82rem] text-ink">
-              <span className="font-semibold">Next time:</span>{" "}
-              {displayReviewText(learning.nextTime)}
-            </p>
-          )}
-          <ul className="mt-1.5 flex flex-wrap gap-1.5">
-            {learning.evidence.map((item) => {
-              const href = linkFor(item.messageId)
-              const what = displayReviewText(item.what) || "View conversation evidence"
-              const line = `seq ${item.seq} · ${what}`
-              return (
-                <li key={`${item.seq}·${item.messageId}`}>
-                  {href === null ? (
-                    <span className="rounded-xs border border-rule px-1.5 py-0.5 font-mono text-[0.72rem] text-ink-soft">
-                      {line}
-                    </span>
-                  ) : (
-                    <Link
-                      to={href}
-                      className="rounded-xs border border-rule px-1.5 py-0.5 font-mono text-[0.72rem] text-custody hover:underline"
-                    >
-                      {line}
-                    </Link>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      ) : null}
+      </div>
+      <p className="mt-1.5 text-[0.82rem] text-ink-soft">{displayReviewText(learning.detail)}</p>
+      {learning.nextTime === undefined || learning.nextTime.trim() === "" ? null : (
+        <p className="mt-1.5 text-[0.82rem] text-ink">
+          <span className="font-semibold">Next time:</span> {displayReviewText(learning.nextTime)}
+        </p>
+      )}
+      {learning.evidence.length === 0 ? null : (
+        // One horizontal scroll row on narrow viewports: wrapping long evidence
+        // lines into a stacked column buries the learning they support.
+        <ul className="mt-1.5 flex flex-wrap gap-1.5 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:pb-1">
+          {learning.evidence.map((item) => {
+            const href = linkFor(item.messageId)
+            const what = displayReviewText(item.what) || "View conversation evidence"
+            const line = `seq ${item.seq} · ${what}`
+            return (
+              <li key={`${item.seq}·${item.messageId}`} className="max-sm:shrink-0">
+                {href === null ? (
+                  <span className="rounded-xs border border-rule px-1.5 py-0.5 font-mono text-[0.72rem] text-ink-soft max-sm:whitespace-nowrap">
+                    {line}
+                  </span>
+                ) : (
+                  <Link
+                    to={href}
+                    className="rounded-xs border border-rule px-1.5 py-0.5 font-mono text-[0.72rem] text-custody hover:underline max-sm:whitespace-nowrap"
+                  >
+                    {line}
+                  </Link>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {lesson === undefined ? null : (
+        <p className="mt-1.5 font-mono text-[0.72rem] text-ink-soft">
+          <StatusWord status={lesson.status} />
+          {` · seen ${lesson.occurrenceCount} ${lesson.occurrenceCount === 1 ? "time" : "times"}`}
+          {` · ${LESSON_AUDIENCE_LABEL[lesson.audience] ?? lesson.audience} · ${lesson.category}`}
+        </p>
+      )}
     </li>
   )
 }
@@ -1433,11 +1466,13 @@ const AiReviewCard = ({
   analysis,
   onRedo,
   failedSeqs,
+  lessons,
 }: {
   review: SessionReviewSummary
   analysis: AiAnalysis
   onRedo: (choice: ReviewerChoice) => void
   failedSeqs: ReadonlySet<number>
+  lessons: ReadonlyArray<SessionLearning>
 }) => {
   const [params] = useSearchParams()
   const { pathname } = useLocation()
@@ -1474,6 +1509,12 @@ const AiReviewCard = ({
   const improvements = signals?.improvements?.entries ?? []
   const numbers = signals?.numbers
   const totalMs = numbers?.durationMs ?? signals?.totalDurationMs ?? 0
+  // Curated lessons carry the same titles as the learnings above: fold each row's
+  // curation status into its learning instead of repeating every title in a second
+  // "Lessons from this session" section below the card.
+  const lessonByTitle = new Map(lessons.map((lesson) => [lesson.title, lesson]))
+  const lessonFor = (learning: AiLearning): SessionLearning | undefined =>
+    lessonByTitle.get(learning.title)
   const [redoOpen, setRedoOpen] = useState(false)
   const redoRef = useRef<HTMLButtonElement>(null)
   const [logOpen, setLogOpen] = useState(false)
@@ -1549,11 +1590,21 @@ const AiReviewCard = ({
                 </span>
               </summary>
               <div className="border-t border-rule px-3 pb-3">
-                <TimelineSection entries={entries} linkFor={linkFor} totalMs={totalMs} failedSeqs={failedSeqs} />
+                <TimelineSection
+                  entries={entries}
+                  linkFor={linkFor}
+                  totalMs={totalMs}
+                  failedSeqs={failedSeqs}
+                />
               </div>
             </details>
           ) : (
-            <TimelineSection entries={entries} linkFor={linkFor} totalMs={totalMs} failedSeqs={failedSeqs} />
+            <TimelineSection
+              entries={entries}
+              linkFor={linkFor}
+              totalMs={totalMs}
+              failedSeqs={failedSeqs}
+            />
           )}
         </>
       )}
@@ -1566,7 +1617,12 @@ const AiReviewCard = ({
               <h4 className="mb-1.5 text-[0.875rem] font-semibold">{group.heading}</h4>
               <ul className="flex flex-col gap-2">
                 {group.learnings.map((learning) => (
-                  <LearningRow key={learning.title} learning={learning} linkFor={linkFor} />
+                  <LearningRow
+                    key={learning.title}
+                    learning={learning}
+                    linkFor={linkFor}
+                    lesson={lessonFor(learning)}
+                  />
                 ))}
               </ul>
             </div>
@@ -1604,7 +1660,12 @@ const AiReviewCard = ({
           <LensHeading>Breadcrumbs and tools worth keeping</LensHeading>
           <ul className="flex flex-col gap-2">
             {breadcrumbs.map((learning) => (
-              <LearningRow key={learning.title} learning={learning} linkFor={linkFor} />
+              <LearningRow
+                key={learning.title}
+                learning={learning}
+                linkFor={linkFor}
+                lesson={lessonFor(learning)}
+              />
             ))}
           </ul>
         </section>
@@ -1940,7 +2001,13 @@ const ReviewPanel = ({
       {ai === null ? (
         <AnalyzeSection analysis={analysis} onStart={run} />
       ) : (
-        <AiReviewCard review={ai} analysis={analysis} onRedo={run} failedSeqs={failedSeqs} />
+        <AiReviewCard
+          review={ai}
+          analysis={analysis}
+          onRedo={run}
+          failedSeqs={failedSeqs}
+          lessons={review.learnings}
+        />
       )}
       <AnalyzeDialog
         open={missingAnalyzer !== null}
@@ -1951,7 +2018,9 @@ const ReviewPanel = ({
           run(choice)
         }}
       />
-      {review.reviews.length === 0 ? null : (
+      {/* The AI card folds curation status into each learning above, so this flat list
+       * only renders for static-only sessions, where it is the one lessons surface. */}
+      {ai !== null || review.reviews.length === 0 ? null : (
         <section>
           <h2 className="mb-2 text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-faded">
             Lessons from this session

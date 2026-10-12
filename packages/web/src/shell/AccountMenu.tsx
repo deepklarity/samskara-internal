@@ -99,7 +99,7 @@ export const AccountMenu = ({ user }: { user: CurrentUser }) => {
   }, [clear, navigate])
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative shrink-0">
       <button
         ref={triggerRef}
         type="button"
@@ -107,7 +107,7 @@ export const AccountMenu = ({ user }: { user: CurrentUser }) => {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
-        className="border border-rule bg-panel-2 px-3 py-1.5 font-mono text-[0.78rem] text-ink-soft"
+        className="border border-rule bg-panel-2 px-3 py-1.5 font-mono text-[0.78rem] text-ink-soft max-sm:max-w-[45vw] max-sm:truncate"
       >
         <span className="text-custody">signed in</span> / {user.githubLogin}
       </button>

@@ -60,7 +60,7 @@ export const Tabs = ({ tabs, selected, onSelect }: Props) => {
             event.preventDefault()
             move(event.key, index)
           }}
-          className={`relative top-px inline-flex shrink-0 items-center gap-2 border border-transparent border-b-0 px-3 py-3 text-[0.78rem] font-semibold uppercase tracking-[0.06em] transition-colors ${
+          className={`relative top-px inline-flex shrink-0 items-center gap-2 whitespace-nowrap border border-transparent border-b-0 px-3 py-3 text-[0.78rem] font-semibold uppercase tracking-[0.06em] transition-colors ${
             tab.id === selected
               ? "rounded-t-sm border-rule bg-panel text-ink before:absolute before:inset-x-0 before:-top-px before:h-[3px] before:rounded-t-sm before:bg-stamp"
               : "text-ink-soft hover:text-ink"
