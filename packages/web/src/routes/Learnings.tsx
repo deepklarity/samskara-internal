@@ -3,6 +3,9 @@ import { useSearchParams } from "react-router-dom"
 import { type ApiError, client, request } from "../api/client.js"
 import type { ProjectSummary } from "../api/types.js"
 import { SessionExpired } from "../auth/SessionExpired.js"
+import { Badge } from "../components/ui/badge.js"
+import { Button } from "../components/ui/button.js"
+import { Card, CardContent } from "../components/ui/card.js"
 import { LoadingShell } from "../shell/LoadingShell.js"
 
 type LearningStatus = "candidate" | "accepted" | "superseded"
@@ -88,18 +91,16 @@ const evidenceLine = (row: LearningRow): string =>
     ? "No evidence recorded"
     : `${row.evidence.length} evidence ${row.evidence.length === 1 ? "pointer" : "pointers"} in the review`
 
+const STATUS_VARIANT: Readonly<Record<LearningStatus, "success" | "secondary" | "destructive">> = {
+  accepted: "success",
+  candidate: "secondary",
+  superseded: "secondary",
+}
+
 const StatusWord = ({ status }: { readonly status: LearningStatus }) => (
-  <span
-    className={
-      status === "accepted"
-        ? "font-semibold text-ok"
-        : status === "superseded"
-          ? "text-faded line-through"
-          : "font-semibold text-stamp"
-    }
-  >
+  <Badge variant={STATUS_VARIANT[status]} className={status === "superseded" ? "line-through" : ""}>
     {STATUS_LABEL[status]}
-  </span>
+  </Badge>
 )
 
 const LearningCard = ({
@@ -113,62 +114,68 @@ const LearningCard = ({
   readonly onStatus: (id: string, status: LearningStatus) => void
   readonly busy: boolean
 }) => (
-  <article className="border border-rule bg-panel p-4">
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <p className="text-[0.9375rem] font-semibold leading-snug">{row.title}</p>
-      <p className="font-mono text-[0.72rem] text-ink-soft">
-        <StatusWord status={row.status} />
-        {` · seen ${row.occurrenceCount} ${row.occurrenceCount === 1 ? "session" : "sessions"}`}
-      </p>
-    </div>
-    <p className="mt-1.5 text-ink-soft">{row.detail}</p>
-    <p className="mt-2 font-mono text-[0.72rem] text-ink-soft">
-      {AUDIENCE_LABEL[row.audience]} · {row.category}
-      {projectName === null ? null : ` · ${projectName}`} · {evidenceLine(row)}
-    </p>
-    {row.status === "accepted" ? (
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onStatus(row.id, "superseded")}
-          className="h-8 rounded-xs border border-rule px-3 text-[0.78rem] font-semibold transition-colors hover:border-ink disabled:cursor-not-allowed disabled:text-faded"
-        >
-          Retire
-        </button>
+  <Card>
+    <CardContent className="p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
+        <p className="text-lead font-semibold leading-snug">{row.title}</p>
+        <div className="flex items-center gap-1.5 text-evidence text-ink-soft">
+          <StatusWord status={row.status} />
+          <span>{`seen in ${row.occurrenceCount} ${row.occurrenceCount === 1 ? "session" : "sessions"}`}</span>
+        </div>
       </div>
-    ) : row.status === "candidate" ? (
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onStatus(row.id, "accepted")}
-          className="h-8 rounded-xs border border-ink bg-ink px-3 text-[0.78rem] font-semibold text-panel-2 transition-colors hover:bg-ink-2 disabled:cursor-not-allowed"
-        >
-          Accept
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onStatus(row.id, "superseded")}
-          className="h-8 rounded-xs border border-rule px-3 text-[0.78rem] font-semibold transition-colors hover:border-ink disabled:cursor-not-allowed disabled:text-faded"
-        >
-          Reject
-        </button>
+      <p className="mt-2 text-body leading-relaxed text-ink-soft">{row.detail}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-evidence text-faded">
+        <span>{AUDIENCE_LABEL[row.audience]}</span>
+        <span aria-hidden="true">·</span>
+        <span>{row.category}</span>
+        {projectName === null ? null : (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>{projectName}</span>
+          </>
+        )}
+        <span aria-hidden="true">·</span>
+        <span>{evidenceLine(row)}</span>
       </div>
-    ) : (
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onStatus(row.id, "candidate")}
-          className="h-8 rounded-xs border border-rule px-3 text-[0.78rem] font-semibold transition-colors hover:border-ink disabled:cursor-not-allowed disabled:text-faded"
-        >
-          Back to candidate
-        </button>
-      </div>
-    )}
-  </article>
+      {row.status === "accepted" ? (
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => onStatus(row.id, "superseded")}
+          >
+            Retire
+          </Button>
+        </div>
+      ) : row.status === "candidate" ? (
+        <div className="mt-4 flex gap-2">
+          <Button size="sm" disabled={busy} onClick={() => onStatus(row.id, "accepted")}>
+            Accept
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => onStatus(row.id, "superseded")}
+          >
+            Reject
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => onStatus(row.id, "candidate")}
+          >
+            Back to candidate
+          </Button>
+        </div>
+      )}
+    </CardContent>
+  </Card>
 )
 
 const CommonCard = ({ row }: { readonly row: CommonRow }) => (

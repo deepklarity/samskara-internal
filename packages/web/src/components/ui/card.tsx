@@ -1,18 +1,23 @@
 import * as React from "react"
 import { cn } from "../../lib/utils"
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "rounded-sm border border-rule bg-card text-card-foreground shadow-card",
-        className,
-      )}
-      {...props}
-    />
-  ),
-)
+/**
+ * Renders as `<article>` when no element is given: a card is a self-contained item
+ * (a session, a lesson), and tests and screen readers both reach for that role.
+ */
+const Card = React.forwardRef<
+  HTMLElement,
+  React.HTMLAttributes<HTMLElement> & { readonly as?: "article" | "div" | "li" }
+>(({ className, as: As = "article", ...props }, ref) => (
+  <As
+    ref={ref as React.Ref<never>}
+    className={cn(
+      "rounded-sm border border-rule bg-card text-card-foreground shadow-card",
+      className,
+    )}
+    {...props}
+  />
+))
 Card.displayName = "Card"
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(

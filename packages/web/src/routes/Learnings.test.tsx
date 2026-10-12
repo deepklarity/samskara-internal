@@ -88,8 +88,9 @@ test("LR1: the page explains that only a person accepts a lesson, and shows cand
   expect(screen.getByText(/samskara learn --write/)).toBeInTheDocument()
   const card = screen.getByText("Bash failed 3 times in a row").closest("article")
   expect(card).not.toBeNull()
-  expect(within(card as HTMLElement).getByText(/seen 2 sessions/)).toBeInTheDocument()
-  expect(within(card as HTMLElement).getByText(/For agents · tool-retry/)).toBeInTheDocument()
+  expect(within(card as HTMLElement).getByText(/seen in 2 sessions/)).toBeInTheDocument()
+  expect(within(card as HTMLElement).getByText("For agents")).toBeInTheDocument()
+  expect(within(card as HTMLElement).getByText("tool-retry")).toBeInTheDocument()
   expect(
     within(card as HTMLElement).getByText("Accept", { selector: "button" }),
   ).toBeInTheDocument()
