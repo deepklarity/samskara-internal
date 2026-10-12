@@ -52,6 +52,7 @@ export type AiReviewOptions = {
   readonly analyzer?: "ai-v1" | "ai-v2"
   readonly harness?: "opencode" | "claude"
   readonly model?: string
+  readonly effort?: "low" | "standard" | "deep"
 }
 
 export type AiReviewDeps = {
@@ -301,6 +302,8 @@ export const runAiReview = async (
       // Absolute paths + verify-first step: a reviewer lost in the wrong cwd exits 0
       // with nothing written, which reads exactly like a quiet success downstream.
       ...(workspaceDir === undefined ? {} : { workspaceDir }),
+      // Per-run effort overrides the env default; standard adds no lines either way.
+      effort: options.effort ?? env.aiReviewEffort,
     }
     const prompt =
       analyzer === "ai-v2" ? buildReviewPromptV2(promptOptions) : buildReviewPrompt(promptOptions)

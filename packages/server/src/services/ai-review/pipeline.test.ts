@@ -53,6 +53,7 @@ const env: Env = {
   localLoginSecret: "",
   localLoginLogin: "samskara-dev",
   aiReviewModel: "fake-model",
+  aiReviewEffort: "standard",
   aiReviewHarness: "opencode",
   aiReviewTimeoutMs: 600000,
 }

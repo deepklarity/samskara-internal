@@ -77,4 +77,16 @@ describe("buildReviewPrompt", () => {
     expect(prompt).not.toContain("NO_FILES")
     expect(buildReviewPrompt({ sessionMeta })).toBe(prompt)
   })
+
+  test("P13: effort low caps scope, deep expands it, standard adds nothing", () => {
+    const low = buildReviewPrompt({ sessionMeta, effort: "low" })
+    expect(low).toContain("## Effort: fast pass")
+    expect(low).toContain("at most 4 timeline entries")
+    const deep = buildReviewPrompt({ sessionMeta, effort: "deep" })
+    expect(deep).toContain("## Effort: deep pass")
+    expect(deep).toContain("up to 10 timeline entries")
+    const standard = buildReviewPrompt({ sessionMeta, effort: "standard" })
+    expect(standard).not.toContain("## Effort:")
+    expect(standard).toBe(buildReviewPrompt({ sessionMeta }))
+  })
 })

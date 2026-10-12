@@ -37,6 +37,7 @@ const env: Env = {
   localLoginSecret: "",
   localLoginLogin: "samskara-dev",
   aiReviewModel: "fake-model",
+  aiReviewEffort: "standard",
   aiReviewHarness: "opencode",
   aiReviewTimeoutMs: 600000,
 }
@@ -494,6 +495,13 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("ai review
     })
     expect(injectedModel.status).toBe(400)
     expect(await injectedModel.json()).toEqual({ error: "invalidModel" })
+
+    const badEffort = await request(`/api/sessions/${sessionId}/analyze`, {
+      method: "POST",
+      body: { effort: "turbo" },
+    })
+    expect(badEffort.status).toBe(400)
+    expect(await badEffort.json()).toEqual({ error: "invalidEffort" })
   })
 
   test("A12: force=true on a session that already holds an ai-v1 review redoes it instead of 409", async () => {

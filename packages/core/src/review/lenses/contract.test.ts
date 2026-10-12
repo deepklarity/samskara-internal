@@ -93,4 +93,15 @@ describe("reviewContractMd", () => {
     expect(contract).toContain("Feeds agentLearnings")
     expect(contract).toContain("say so in the summary instead of stretching one")
   })
+
+  test("C8: pins the breadcrumb intent — context-free test, NOT-list, fewer-stronger", () => {
+    const contract = flat()
+    expect(contract).toContain("What a breadcrumb is for")
+    expect(contract).toContain("future session on a different task")
+    expect(contract).toContain("A breadcrumb is NOT:")
+    expect(contract).toContain("that dies with the branch")
+    expect(contract).toContain("that is timeline")
+    expect(contract).toContain("Three strong breadcrumbs beat six thin ones")
+    expect(contract).toContain("filler teaches future sessions that")
+  })
 })

@@ -52,6 +52,7 @@ const env: Env = {
   localLoginSecret: "",
   localLoginLogin: "samskara-dev",
   aiReviewModel: "zai-coding-plan/glm-5.3",
+  aiReviewEffort: "standard",
   aiReviewHarness: "opencode",
   aiReviewTimeoutMs: 600000,
 }

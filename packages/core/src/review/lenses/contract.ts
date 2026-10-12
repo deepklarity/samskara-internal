@@ -81,6 +81,24 @@ the run, and the run has a hard time limit.
   not a correction; it is a map marker. Only record it when it is standard enough to be
   worth keeping, and cite where in the transcript it was worked out.
 
+## What a breadcrumb is for
+
+A breadcrumb serves a future session on a different task. Before writing one, run this
+test: strip every name specific to this session — branches, PR numbers, people, dates,
+repo paths — and read what is left. If nothing usable remains, it is not a breadcrumb;
+put the observation in the timeline or summary instead.
+
+A breadcrumb is NOT:
+
+- a pointer to this session's state ("PR 32 lives on branch task-instrument-state",
+  "expect force-push after the next rebase") — that dies with the branch;
+- a summary of what happened ("the rework landed as mergeable") — that is timeline;
+- a compliment or a restated learning — corrections belong in the two audiences above.
+
+Three strong breadcrumbs beat six thin ones. An empty breadcrumbs section with one line
+saying why nothing earned a place beats filler: filler teaches future sessions that
+breadcrumbs are noise, and then the good ones get ignored too.
+
 A learning must name a change, not a compliment. "Keep doing what you did" is not a
 learning — if a behavior was right, say so in the summary and write the "Nothing to
 change" entry for that audience. Write a learning only when something observable would

@@ -20,6 +20,11 @@ export type ReviewPromptOptions = {
    * `deliverableMissing` the server cannot distinguish from a quiet success).
    */
   readonly workspaceDir?: string
+  /**
+   * How hard to work: review depth, not model size. Standard behaves exactly as
+   * the contract describes. Low caps scope for a fast pass; deep expands it.
+   */
+  readonly effort?: "low" | "standard" | "deep"
 }
 
 const sessionSection = (meta: ReviewPromptOptions["sessionMeta"]): string[] => [
@@ -51,6 +56,23 @@ const workspaceSection = (workspaceDir?: string): string[] => {
   ]
 }
 
+const effortSection = (effort?: "low" | "standard" | "deep"): string[] => {
+  if (effort === undefined || effort === "standard") return []
+  if (effort === "low")
+    return [
+      "## Effort: fast pass",
+      "",
+      "Work fast: at most 4 timeline entries; write a learning only for high-severity findings; an empty section with a reason beats filler.",
+      "",
+    ]
+  return [
+    "## Effort: deep pass",
+    "",
+    "Be thorough: up to 10 timeline entries; check every failure mode twice, including secondary evidence; chase one level deeper than the contract's minimum.",
+    "",
+  ]
+}
+
 const DELIVERABLE = [
   "## Deliverable",
   "",
@@ -64,6 +86,7 @@ export const buildReviewPrompt = (options: ReviewPromptOptions): string =>
     "",
     ...sessionSection(options.sessionMeta),
     ...workspaceSection(options.workspaceDir),
+    ...effortSection(options.effort),
     ...DELIVERABLE,
   ]
     .join("\n")

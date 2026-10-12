@@ -63,6 +63,8 @@ const analyzeBodySchema = z
     /** Explicit opt-in while the code-aware contract is evaluated beside ai-v1. */
     analyzer: z.enum(["ai-v1", "ai-v2"]).optional(),
     harness: z.enum(["opencode", "claude"]).optional(),
+    // Per-run effort override; absent means the server's AI_REVIEW_EFFORT.
+    effort: z.enum(["low", "standard", "deep"]).optional(),
     // Model ids reach a guest `sh -lc` string (runner.ts, quoted) and the soft runners'
     // argv: keep shell metacharacters out at the gate, not at each use site.
     model: z
@@ -286,6 +288,7 @@ export const reviewRoutes = ({ db, env, aiReviewRunner, aiReviewJobs }: AiReview
           analyzer: "invalidAnalyzer",
           harness: "invalidHarness",
           model: "invalidModel",
+          effort: "invalidEffort",
           force: "invalidForce",
         }
         return c.json({ error: codes[String(field)] ?? "invalidAnalyzeBody" }, 400)

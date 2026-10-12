@@ -33,6 +33,7 @@ const env: Env = {
   superAdminLogins: [],
   aiReviewHarness: "opencode",
   aiReviewModel: "zai-coding-plan/glm-5.3-flash",
+  aiReviewEffort: "standard",
   aiReviewTimeoutMs: 600_000,
 }
 

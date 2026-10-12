@@ -31,9 +31,22 @@ const BaseEnvSchema = z.object({
   AI_REVIEW_TIMEOUT_MS: z
     .string()
     .regex(/^\d+$/, "AI_REVIEW_TIMEOUT_MS must be digits (milliseconds)")
-    .default("900000")
-    .transform((value) => Number(value)),
+    .optional(),
+  /**
+   * How hard the reviewer works: prompt depth, not model size. low = fast pass
+   * (few entries, high-severity findings only); standard = the full contract;
+   * deep = up to 10 timeline entries, every failure mode checked twice. Also sets
+   * the default harness timeout when AI_REVIEW_TIMEOUT_MS is unset.
+   */
+  AI_REVIEW_EFFORT: z.enum(["low", "standard", "deep"]).default("standard"),
 })
+
+/** Default harness timeout per effort level (ms): how long a review may take. */
+export const EFFORT_TIMEOUT_MS: Readonly<Record<"low" | "standard" | "deep", number>> = {
+  low: 300_000,
+  standard: 900_000,
+  deep: 1_800_000,
+}
 
 /** A model id the paired harness CLI understands when no explicit one is configured. */
 export const DEFAULT_REVIEW_MODEL: Readonly<Record<"opencode" | "claude", string>> = {
@@ -71,6 +84,7 @@ export type Env = {
   readonly localLoginLogin?: string | undefined
   readonly aiReviewHarness: "opencode" | "claude"
   readonly aiReviewModel: string
+  readonly aiReviewEffort: "low" | "standard" | "deep"
   readonly aiReviewTimeoutMs: number
 }
 
@@ -100,6 +114,10 @@ export const loadEnv = (source: Source = process.env): Env => {
     aiReviewHarness: parsed.data.AI_REVIEW_HARNESS,
     aiReviewModel:
       parsed.data.AI_REVIEW_MODEL ?? DEFAULT_REVIEW_MODEL[parsed.data.AI_REVIEW_HARNESS],
-    aiReviewTimeoutMs: parsed.data.AI_REVIEW_TIMEOUT_MS,
+    aiReviewEffort: parsed.data.AI_REVIEW_EFFORT,
+    aiReviewTimeoutMs:
+      parsed.data.AI_REVIEW_TIMEOUT_MS === undefined
+        ? EFFORT_TIMEOUT_MS[parsed.data.AI_REVIEW_EFFORT]
+        : Number(parsed.data.AI_REVIEW_TIMEOUT_MS),
   }
 }

@@ -26,6 +26,7 @@ describe("loadEnv", () => {
       localLoginLogin: "samskara-dev",
       aiReviewHarness: "opencode",
       aiReviewModel: "opencode/muse-spark-1.3-contributor-free",
+      aiReviewEffort: "standard",
       aiReviewTimeoutMs: 900000,
       webDist: undefined,
     })
@@ -110,7 +111,21 @@ describe("loadEnv", () => {
   test("defaults AI_REVIEW_MODEL to opencode/muse-spark-1.3-contributor-free and AI_REVIEW_TIMEOUT_MS to 900000", () => {
     const env = loadEnv(complete)
     expect(env.aiReviewModel).toBe("opencode/muse-spark-1.3-contributor-free")
+    expect(env.aiReviewEffort).toBe("standard")
     expect(env.aiReviewTimeoutMs).toBe(900000)
+  })
+
+  test("AI_REVIEW_EFFORT scales the default timeout; an explicit timeout wins", () => {
+    expect(loadEnv({ ...complete, AI_REVIEW_EFFORT: "low" }).aiReviewTimeoutMs).toBe(300_000)
+    expect(loadEnv({ ...complete, AI_REVIEW_EFFORT: "deep" }).aiReviewTimeoutMs).toBe(1_800_000)
+    expect(
+      loadEnv({ ...complete, AI_REVIEW_EFFORT: "deep", AI_REVIEW_TIMEOUT_MS: "1500" })
+        .aiReviewTimeoutMs,
+    ).toBe(1500)
+  })
+
+  test("rejects an unknown AI_REVIEW_EFFORT", () => {
+    expect(() => loadEnv({ ...complete, AI_REVIEW_EFFORT: "turbo" })).toThrow(/AI_REVIEW_EFFORT/)
   })
 
   test("reads AI_REVIEW_MODEL verbatim and coerces digit AI_REVIEW_TIMEOUT_MS to a number", () => {
