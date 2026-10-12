@@ -1536,7 +1536,7 @@ test("AI review: an old-shape ai-v1 row renders its verdict sentence, audience g
     within(panel).getByRole("heading", { name: "What you could do differently" }),
   ).toBeInTheDocument()
   expect(within(panel).queryByRole("heading", { name: "The agent" })).not.toBeInTheDocument()
-  const evidence = within(panel).getByRole("link", { name: /seq 1 · prompt names no table/ })
+  const evidence = within(panel).getByRole("link", { name: /seq 1\s*prompt names no table/ })
   expect(evidence).toHaveAttribute("href", expect.stringContaining("tab=conversation"))
   expect(evidence).toHaveAttribute("href", expect.stringContaining("m=m-2"))
 
@@ -2093,7 +2093,7 @@ test("AI-9c: learnings render under the three audience headers with severity, co
   const harnessRow = within(panel)
     .getByText(/exporter delivered an empty promise/i)
     .closest("li") as HTMLElement
-  expect(within(harnessRow).getByText("high")).toBeInTheDocument()
+  expect(within(harnessRow).getByText("High")).toBeInTheDocument()
   expect(within(harnessRow).getByText("95s of 278s — 34% of the session")).toBeInTheDocument()
   expect(within(harnessRow).queryByRole("button")).not.toBeInTheDocument()
   expect(
@@ -2103,7 +2103,7 @@ test("AI-9c: learnings render under the three audience headers with severity, co
     within(harnessRow).getByText(/Assert the export exists before spawning the reviewer\./),
   ).toBeInTheDocument()
   expect(within(harnessRow).getByText("Next time:")).toBeInTheDocument()
-  const evidence = within(harnessRow).getByRole("link", { name: /seq 4 · first failed read/ })
+  const evidence = within(harnessRow).getByRole("link", { name: /seq 4\s*first failed read/ })
   expect(evidence).toHaveAttribute("href", expect.stringContaining("tab=conversation"))
   expect(evidence).toHaveAttribute("href", expect.stringContaining("m=m-4"))
 

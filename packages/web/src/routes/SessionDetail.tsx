@@ -979,6 +979,13 @@ const SEVERITY_TONE: Readonly<Record<string, string>> = {
   high: "border-err/40 text-err",
 }
 
+/** Severity reads as a word, not a whisper: "Medium" is a label, "medium" is a hint. */
+const SEVERITY_LABEL: Readonly<Record<string, string>> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+}
+
 // Titles beginning this way are explicit nothing-entries: the audience was considered and
 // came up empty (mirrors NOTHING_TO_CHANGE_PREFIX in @samskara/core's lens schema).
 const NOTHING_TO_CHANGE_PREFIX = "Nothing to change"
@@ -1010,7 +1017,7 @@ const LearningRow = ({
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         {learning.severity === undefined ? null : (
           <Chip tone={SEVERITY_TONE[learning.severity] ?? "border-rule text-ink-soft"}>
-            {learning.severity}
+            {SEVERITY_LABEL[learning.severity] ?? learning.severity}
           </Chip>
         )}
         <span className="text-[0.9375rem] font-semibold leading-snug">
@@ -1027,25 +1034,36 @@ const LearningRow = ({
         </p>
       )}
       {learning.evidence.length === 0 ? null : (
-        // One horizontal scroll row on narrow viewports: wrapping long evidence
-        // lines into a stacked column buries the learning they support.
-        <ul className="mt-1.5 flex flex-wrap gap-1.5 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:pb-1">
+        // Evidence is a footnote, not the headline: the seq anchor carries the link, the
+        // quote is clipped to a readable fragment, and the full text lives in the title.
+        // One horizontal scroll row on narrow viewports so long quotes never stack.
+        <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:pb-1">
           {learning.evidence.map((item) => {
             const href = linkFor(item.messageId)
             const what = displayReviewText(item.what) || "View conversation evidence"
-            const line = `seq ${item.seq} · ${what}`
+            const clipped = what.length > 48 ? `${what.slice(0, 48).trimEnd()}…` : what
+            const anchor = (
+              <>
+                <span className="font-mono text-faded">seq {item.seq}</span>
+                <span className="text-faded">{clipped}</span>
+              </>
+            )
             return (
               <li key={`${item.seq}·${item.messageId}`} className="max-sm:shrink-0">
                 {href === null ? (
-                  <span className="rounded-xs border border-rule px-1.5 py-0.5 font-mono text-[0.72rem] text-ink-soft max-sm:whitespace-nowrap">
-                    {line}
+                  <span
+                    title={what}
+                    className="inline-flex max-w-full items-baseline gap-1.5 text-[0.78rem] max-sm:whitespace-nowrap"
+                  >
+                    {anchor}
                   </span>
                 ) : (
                   <Link
                     to={href}
-                    className="rounded-xs border border-rule px-1.5 py-0.5 font-mono text-[0.72rem] text-custody hover:underline max-sm:whitespace-nowrap"
+                    title={what}
+                    className="inline-flex max-w-full items-baseline gap-1.5 border-b border-transparent text-[0.78rem] hover:border-custody max-sm:whitespace-nowrap"
                   >
-                    {line}
+                    {anchor}
                   </Link>
                 )}
               </li>
@@ -1054,7 +1072,7 @@ const LearningRow = ({
         </ul>
       )}
       {lesson === undefined ? null : (
-        <p className="mt-1.5 font-mono text-[0.72rem] text-ink-soft">
+        <p className="mt-2 text-[0.72rem] text-faded">
           <StatusWord status={lesson.status} />
           {` · seen ${lesson.occurrenceCount} ${lesson.occurrenceCount === 1 ? "time" : "times"}`}
           {` · ${LESSON_AUDIENCE_LABEL[lesson.audience] ?? lesson.audience} · ${lesson.category}`}
