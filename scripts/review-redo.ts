@@ -34,7 +34,8 @@ const started = await api(`/api/sessions/${sessionId}/analyze`, {
   method: "POST",
   body: JSON.stringify({ force: true }),
 })
-if (started.status !== 202) throw new Error(`analyze refused: ${started.status} ${await started.text()}`)
+if (started.status !== 202)
+  throw new Error(`analyze refused: ${started.status} ${await started.text()}`)
 const { jobId } = (await started.json()) as { jobId: string }
 console.log(`job ${jobId.slice(0, 8)}… started, polling to ${timeoutMs}ms`)
 

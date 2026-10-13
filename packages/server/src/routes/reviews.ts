@@ -15,8 +15,8 @@ import {
   listLearnings,
   listLearningsForSession,
   listReviewsForSession,
-  setLearningStatus,
   setLearningRoute,
+  setLearningStatus,
   visibleSessionProjectId,
 } from "../repositories/reviews.repo.js"
 import { getDetail } from "../repositories/sessions.repo.js"
@@ -55,7 +55,15 @@ const serializeLearning = (row: LearningRow) => ({
 
 const audienceSchema = z.enum(["agent", "human"])
 const statusSchema = z.enum(["candidate", "accepted", "superseded"])
-const routeSchema = z.enum(["docs", "breadcrumbs", "tools", "scripts", "skills", "code-changes", "none"])
+const routeSchema = z.enum([
+  "docs",
+  "breadcrumbs",
+  "tools",
+  "scripts",
+  "skills",
+  "code-changes",
+  "none",
+])
 
 /** The per-run reviewer choice the modal posts; absent fields keep the env defaults. */
 const analyzeBodySchema = z

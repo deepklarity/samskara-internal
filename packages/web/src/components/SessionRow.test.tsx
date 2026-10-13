@@ -172,7 +172,11 @@ test("size pill buckets Small/Medium/Large/Very large, and one Long pill past 2h
 
 test("without a server breakdown the row falls back to the single total line", () => {
   // A row built before the server sent a breakdown still renders its single total.
-  const legacy = { ...populated, tokensInput: undefined, tokensOutput: undefined } as unknown as SessionSummary
+  const legacy = {
+    ...populated,
+    tokensInput: undefined,
+    tokensOutput: undefined,
+  } as unknown as SessionSummary
   renderRow(legacy)
   const row = screen.getByRole("link")
   expect(row).toHaveTextContent("128.4k tokens")

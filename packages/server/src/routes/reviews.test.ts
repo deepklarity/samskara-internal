@@ -3,8 +3,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest"
 import { buildApp } from "../app.js"
 import type { Db } from "../db/client.js"
 import {
-  learnings as learningsTable,
   learningSessions,
+  learnings as learningsTable,
   messages,
   projects,
   sessionReviews,

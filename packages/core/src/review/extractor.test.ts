@@ -198,8 +198,14 @@ describe("extractLearnings", () => {
       )
     const alice = churnOn("/Users/alice/work/app/src/one.ts")
     const bob = churnOn("/home/bob/checkouts/app/src/one.ts")
-    const relA = relativizeEditEvents(alice.events, new Map([["/Users/alice/work/app/src/one.ts", "src/one.ts"]]))
-    const relB = relativizeEditEvents(bob.events, new Map([["/home/bob/checkouts/app/src/one.ts", "src/one.ts"]]))
+    const relA = relativizeEditEvents(
+      alice.events,
+      new Map([["/Users/alice/work/app/src/one.ts", "src/one.ts"]]),
+    )
+    const relB = relativizeEditEvents(
+      bob.events,
+      new Map([["/home/bob/checkouts/app/src/one.ts", "src/one.ts"]]),
+    )
     const fpA = extractLearnings(
       heuristicSessionAnalyzer.analyze({ sessionId: "s", events: relA }).signals,
       relA,

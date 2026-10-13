@@ -414,7 +414,12 @@ describe("reviewCommand --ai", () => {
     expect(out.join("")).toContain("shipped — work landed (commit or PR)")
   })
 
-  for (const code of ["harnessFailed", "unparseable", "ungrounded", "deliverableMissing"] as const) {
+  for (const code of [
+    "harnessFailed",
+    "unparseable",
+    "ungrounded",
+    "deliverableMissing",
+  ] as const) {
     test(`RV16 (${code}): a terminal failed job exits 1 with the code on stderr and no verdict on stdout`, async () => {
       const out: string[] = []
       const err: string[] = []

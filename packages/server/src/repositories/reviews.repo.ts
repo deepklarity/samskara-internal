@@ -216,7 +216,9 @@ export const listGroupedLearnings = async (
       count: sql<number>`sum(${learnings.occurrenceCount})::int`,
       firstSeenAt: sql<string>`min(${learnings.firstSeenAt})::text`,
       lastSeenAt: sql<string>`max(${learnings.lastSeenAt})::text`,
-      statusBreakdown: sql<Record<string, number>>`jsonb_build_object('candidate', count(*) filter (where ${learnings.status} = 'candidate'), 'accepted', count(*) filter (where ${learnings.status} = 'accepted'), 'superseded', count(*) filter (where ${learnings.status} = 'superseded'))`,
+      statusBreakdown: sql<
+        Record<string, number>
+      >`jsonb_build_object('candidate', count(*) filter (where ${learnings.status} = 'candidate'), 'accepted', count(*) filter (where ${learnings.status} = 'accepted'), 'superseded', count(*) filter (where ${learnings.status} = 'superseded'))`,
     })
     .from(learnings)
     .innerJoin(projects, eq(projects.id, learnings.projectId))
@@ -336,7 +338,14 @@ export const setLearningStatus = async (
   return row ?? null
 }
 
-export type LearningRoute = "docs" | "breadcrumbs" | "tools" | "scripts" | "skills" | "code-changes" | "none"
+export type LearningRoute =
+  | "docs"
+  | "breadcrumbs"
+  | "tools"
+  | "scripts"
+  | "skills"
+  | "code-changes"
+  | "none"
 
 export const setLearningRoute = async (
   db: Querier,
