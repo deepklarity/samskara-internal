@@ -20,7 +20,9 @@ import { Card, CardContent } from "./ui/card.js"
 const asRange = (value: string): Range => RANGES.find((range) => range === value) ?? "all"
 const asSort = (value: string): Sort => SORTS.find((sort) => sort === value) ?? "recent"
 
-const selectClass = `${controlClass} mt-0 cursor-pointer appearance-none pr-7`
+// A native select styled as a shadcn trigger: the chevron is drawn, not faked with a
+// second element, and the control keeps a real focus ring.
+const selectClass = `${controlClass} mt-0 cursor-pointer appearance-none bg-[length:16px] bg-[right_0.6rem_center] bg-no-repeat pr-9`
 
 /** Its two callers map over client constants, so this shape is not the server's to change. */
 type Choosable = { readonly value: string; readonly label: string }
@@ -89,12 +91,9 @@ const TextFilter = ({
         placeholder={placeholder}
         hint={hint}
         trailing={
-          <button
-            type="submit"
-            className="shrink-0 rounded-xs border border-rule bg-panel-2 px-2 font-mono text-[0.72rem] font-semibold hover:border-ink"
-          >
+          <Button type="submit" variant="secondary" size="sm" className="shrink-0">
             Apply
-          </button>
+          </Button>
         }
       />
     </form>

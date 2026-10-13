@@ -6,8 +6,8 @@ import { type ReactNode, useId } from "react"
  * same class strings.
  */
 export const controlClass =
-  "mt-1 h-9 w-full min-w-0 rounded-xs border border-rule bg-panel-2 px-2 font-mono text-[0.78rem] leading-none text-ink transition-colors hover:border-ink-soft focus-visible:border-custody"
-export const labelClass = "block text-label font-semibold text-ink-soft"
+  "mt-1 h-9 w-full min-w-0 rounded-md border border-input bg-card px-3 text-body leading-none text-ink shadow-xs transition-colors placeholder:text-muted-foreground hover:border-ring/40 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none"
+export const labelClass = "block text-evidence font-medium text-muted-foreground"
 
 type Props = {
   readonly label: string
