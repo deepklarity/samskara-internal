@@ -252,6 +252,54 @@ SourceAdapter→AgentPlugin, artifact flow split).
   `vertexcover-io-samskara`. Build note: `writeup/self-learning/roadmaps/B-opencode-build.md`.
   Gates: lint/typecheck/test:core green; 2 cli test failures pre-exist on master.
 
+## Session handoff — 2026-10-12 (branch pr-29, verified state)
+
+Everything below was verified in this session; start here before reading older sections.
+
+**Green baseline:** typecheck clean; web 373/373 (vitest), cli 568/568, core 293/293,
+server 320 passing with 2 pre-existing failures (`stageReviewEvidence`, `validateCodeGroundingV2`
+— both fail identically on clean HEAD). lint clean except 2 pre-existing warnings.
+
+**Local stack is the one in use (no Docker, per owner ruling):** Postgres 5432 with the
+`samskara` role, server on 3000 (started with `AI_REVIEW_HARDEN=0` — the MSB guest cannot
+reach the model here, so the soft runner is the working path), web on 8000. CLI paired by
+writing a local-login JWT to `~/.samskara/token`. Sign-in secret is `LOCAL_LOGIN_SECRET` in
+`.env`. Server test URL: `SAMSKARA_TEST_DATABASE_URL=postgres://d@127.0.0.1:5432/postgres`.
+
+**Capture watcher was dead and is now alive (pid varies).** It crashed 2026-10-09 on a
+stale `artifact-queue.json.lock`; cleared the lock and restarted. Anaira capture disabled
+(its project id pointed at a deleted row, so every flush 403'd). Oss and samskara enabled.
+58 sessions ingested. Watcher-death is still invisible to the user — surfacing it (a
+last-ingest age in `samskara status`, or a Sync-page heartbeat) is unowned and worth doing.
+
+**Delivered this session (commits 3f91c5d..c0786ad):**
+- Projects page listed only 5 sessions; now fetches 100 with "Show more (N remaining)".
+- Timeline charged unattended overnight gaps as work, making one entry read "98% of
+  timeline". Idle spans now charge nothing and label "mostly idle" (`isIdleSpan`/`activeSpanMs`).
+- Whole frontend moved onto a shadcn foundation: `components/ui/*` + `cn()` in `lib/utils`,
+  tokens in `index.css`. Shell, sessions, filter bar, session detail, learnings, projects,
+  orgs, sync, login all converted. Every surface screenshotted at 1440 and 390.
+- Learning rows: evidence became a clipped footnote; severity reads as words.
+- Implemented `relativizeEditEvents`/`safeEditPath` (unfinished TDD work that was breaking
+  `bun run typecheck`).
+- Security: model id is now shell-quoted and allowlisted at the analyze gate; review
+  sandboxes are labelled and crash-orphans are reaped at server startup.
+
+**Tooling worth reusing:** `scripts/review-shot.ts` (authenticated screenshots of a review
+tab), `scripts/review-redo.ts` (force a fresh review, waits for its own job — earlier
+version printed a stale verdict).
+
+**Next, in order:**
+1. Review-tab verdict header is the least refined surface left.
+2. Route learnings into the harness — accepted learnings have a `route` target in the DB
+   with no consumer.
+3. Surfacing watcher death (see above).
+4. Security leftovers: credential staging for reviewer sandboxes, host paths in job error
+   detail, git-cwd allowlist.
+5. Delegation is unreliable right now: agents repeatedly started in a stale foreign
+   context or wrote half-finished files. Prefer in-thread work; verify every agent's
+   scoped tests yourself rather than trusting its summary.
+
 ## What happens next (synthesized order, mission-control wins)
 
 1. ~~opencode capture source~~ DONE (increment 1 above). Next slice candidates: artifacts
