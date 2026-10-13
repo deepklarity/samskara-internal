@@ -41,6 +41,17 @@ describe("reviewEventsFromMessages on stored rows", () => {
     expect(prompts).toHaveLength(0)
   })
 
+  test("P4: a subagent-track user message is not a human prompt", () => {
+    const events = reviewEventsFromMessages([
+      storedUserMessage(),
+      storedUserMessage({ trackId: "agent:abc123" }),
+    ])
+    const prompts = events.filter((event) => event.kind === "userMessage" && !event.isMeta)
+    expect(prompts).toHaveLength(1)
+    const review = heuristicSessionAnalyzer.analyze({ sessionId: "s", events })
+    expect(review.signals.userPrompts).toBe(1)
+  })
+
   test("P3: the analyzer counts the stored-row prompt in userPrompts", () => {
     const review = heuristicSessionAnalyzer.analyze({
       sessionId: "s",

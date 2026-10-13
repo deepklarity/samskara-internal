@@ -67,7 +67,9 @@ export const reviewEventsFromMessages = (
         if (message.role === "user") {
           // Stored rows carry null where normalized messages carry undefined, so absent means
           // both. isMeta from details wins; a non-empty subType marks a harness injection.
-          const isMeta = message.details?.isMeta ?? (message.subType ?? null) !== null
+          const isMeta =
+            (message.details?.isMeta ?? (message.subType ?? null) !== null) ||
+            (message.trackId ?? "main") !== "main"
           const text =
             message.content.type === "text"
               ? message.content.value
@@ -125,3 +127,34 @@ export const reviewEventsFromMessages = (
   }
   return sequenceEvents(bodies)
 }
+
+/**
+ * Strip the machine-specific prefix from an absolute edit path so two people editing the
+ * same file on different checkouts produce the same fingerprint. Home-directory segments
+ * (`/Users/alice`, `/home/bob`) are dropped along with everything above the repo root; a
+ * path we cannot anchor becomes its last two segments, which still keeps the file name and
+ * its immediate parent while never carrying a username.
+ */
+export const safeEditPath = (path: string): string => {
+  const segments = path.split("/").filter((segment) => segment !== "")
+  const home = segments.findIndex((segment) => segment === "Users" || segment === "home")
+  // Skip past the account segment that follows a home root: /Users/alice and /home/bob.
+  const from = home === -1 ? 0 : home + 2
+  const tail = segments.slice(Math.max(from, segments.length - 2))
+  return tail.length === 0 ? path : tail.join("/")
+}
+
+/**
+ * Rewrite edit-event paths through a capture-supplied mapping first (the authoritative
+ * repo-relative path recorded with the session), falling back to {@link safeEditPath}.
+ * Non-edit events pass through untouched.
+ */
+export const relativizeEditEvents = <T extends { readonly kind: string; readonly path?: string }>(
+  events: ReadonlyArray<T>,
+  repoRelative: ReadonlyMap<string, string>,
+): ReadonlyArray<T> =>
+  events.map((event) =>
+    event.kind === "edit" && event.path !== undefined
+      ? ({ ...event, path: repoRelative.get(event.path) ?? safeEditPath(event.path) } as T)
+      : event,
+  )

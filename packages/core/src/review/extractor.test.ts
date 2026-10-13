@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest"
 import { heuristicSessionAnalyzer } from "./analyzer.js"
 import type { ReviewEventBody } from "./events.js"
+import { relativizeEditEvents, safeEditPath } from "./events.js"
 import { extractLearnings } from "./extractor.js"
 import type { SessionReview } from "./types.js"
 
@@ -184,5 +185,38 @@ describe("extractLearnings", () => {
     for (const learning of [...agent, ...human]) {
       expect(learning.evidence.length).toBeGreaterThan(0)
     }
+  })
+
+  test("X10: the same file on different machines shares a fingerprint and leaks no username", () => {
+    const churnOn = (abs: string) =>
+      reviewWith(
+        prompt("go"),
+        { kind: "edit", path: abs },
+        { kind: "edit", path: abs },
+        { kind: "edit", path: abs },
+        { kind: "turn", status: "completed" },
+      )
+    const alice = churnOn("/Users/alice/work/app/src/one.ts")
+    const bob = churnOn("/home/bob/checkouts/app/src/one.ts")
+    const relA = relativizeEditEvents(alice.events, new Map([["/Users/alice/work/app/src/one.ts", "src/one.ts"]]))
+    const relB = relativizeEditEvents(bob.events, new Map([["/home/bob/checkouts/app/src/one.ts", "src/one.ts"]]))
+    const fpA = extractLearnings(
+      heuristicSessionAnalyzer.analyze({ sessionId: "s", events: relA }).signals,
+      relA,
+    ).agent.find((l) => l.category === "rework")
+    const fpB = extractLearnings(
+      heuristicSessionAnalyzer.analyze({ sessionId: "s", events: relB }).signals,
+      relB,
+    ).agent.find((l) => l.category === "rework")
+    expect(fpA).toBeDefined()
+    expect(fpB).toBeDefined()
+    expect(fpA?.fingerprint).toBe(fpB?.fingerprint)
+    for (const text of [fpA?.title ?? "", fpA?.detail ?? "", fpB?.title ?? "", fpB?.detail ?? ""]) {
+      expect(text).not.toContain("alice")
+      expect(text).not.toContain("bob")
+    }
+    // An edit with no artifact row still loses the username via the capture fallback.
+    expect(safeEditPath("/Users/alice/work/app/src/two.ts")).not.toContain("alice")
+    expect(safeEditPath("/home/bob/checkouts/app/src/two.ts")).not.toContain("bob")
   })
 })
