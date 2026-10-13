@@ -252,7 +252,68 @@ SourceAdapter→AgentPlugin, artifact flow split).
   `vertexcover-io-samskara`. Build note: `writeup/self-learning/roadmaps/B-opencode-build.md`.
   Gates: lint/typecheck/test:core green; 2 cli test failures pre-exist on master.
 
-## Session handoff — 2026-10-12 (branch pr-29, verified state)
+## Session handoff — 2026-10-12 (evening), branch pr-29
+
+Supersedes the morning handoff below only where they differ. Verified state at stop:
+
+**Green baseline:** typecheck clean; web 373/373 (vitest), cli 568/568, core 293/293,
+server 320 passing with 2 pre-existing failures (`stageReviewEvidence`,
+`validateCodeGroundingV2` — both fail identically on clean HEAD).
+
+**Local stack (no Docker, owner ruling):** Postgres 5432 (`samskara` role), server 3000
+(started with `AI_REVIEW_HARDEN=0` — the MSB guest cannot reach the model here, so the soft
+runner is the working path), web 8000, CLI paired via a local-login token at
+`~/.samskara/token`. Server tests: `SAMSKARA_TEST_DATABASE_URL=postgres://d@127.0.0.1:5432/postgres`.
+Sign-in secret is `LOCAL_LOGIN_SECRET` in `.env`. Capture watcher is running (revived after
+the Oct-9 lockfile crash); anaira capture disabled; 72 sessions ingested.
+
+**Theme fix that mattered most:** every radius token was 2–3px, which is what made the whole
+UI read as dated. Now 4/6/8/12/14px (`index.css`), plus sans-serif rounded-md filter
+controls with a focus ring. Session rows carry ONE badge ("Long · Very large"), not two.
+
+**Commits this session:** `3f91c5d` projects page lists all sessions (was capped at 5) ·
+`0db5089` idle spans charge no work time ("mostly idle", was "98%") · `8029faf` shadcn
+foundation + first conversion · `923214a` evidence becomes a clipped footnote ·
+`379b224` learnings page on Card/Badge/Button · `ba3c658` projects/orgs/sync/login converted
+· `43d10e0` session-detail panels on primitives · `c0786ad` implemented the abandoned
+`relativizeEditEvents`/`safeEditPath` (it was breaking typecheck) · `744b33a` earlier
+handoff · `d5cf63d` modern radii + herdr model rule · `a3356ea` modern filter controls.
+
+### Two mistakes worth not repeating
+
+1. **Do not tell an agent to run `/model`.** It is a TUI action; the agent stalls on the
+   picker (it did exactly this). The correct form is `herdr agent start <name> --kind
+   opencode --pane <id> -- --model <provider/model>` — native flags go after `--`. This is
+   now written into `AGENTS.md`. Verify with the `argv` herdr echoes back, not by asking
+   the agent.
+2. **`glm-5.3-flash` is not unavailable — I tested it wrong.** I ran `opencode run --model
+   glm-5.3-flash` (no provider prefix), got an error, and concluded the model was broken.
+   Correct ids: `opencode/glm-5.3-flash` exists but returns "Insufficient account funds";
+   `opencode-go/glm-5.3-flash` needs a Go subscription; **`zai-coding-plan/glm-5-turbo`
+   works** and is the one to use for a GLM audit agent. Verified 2026-10-12.
+
+### Open at stop (owner asked to stop here)
+
+- **Review-quality audit was running and got cancelled.** A GLM-5-Turbo agent was auditing
+  the persisted review of session `e676344b-6c06-4ecb-bb69-188eff5bd3ae` ("Codegen verb
+  refactor", 490 records, 131 tool calls) against the project's intent — every session
+  becomes a reusable, evidenced lesson routed into the harness so future sessions improve.
+  Task was: top 10 gaps in that review, each with quoted evidence, why it matters, and the
+  smallest concrete fix (contract.ts / schema.ts / prompt.ts / pipeline.ts / persistence),
+  ranked, ending with a top 3. Nothing was delivered. Restart it with:
+  `herdr agent start review-audit --kind opencode --pane $PANE -- --model zai-coding-plan/glm-5-turbo`
+  then redo the brief above. The owner's note: the review reads as "complete slop and
+  shallow — timeline shallow, findings barely readable".
+- **Frontend polish not finished:** filter bar restyled but not re-screenshotted; the review
+  tab's verdict header is still the least refined surface; no shadcn Select/Input
+  components exist yet (only Button/Card/Badge/Separator/Progress/Tooltip) — the filter
+  controls are restyled natives, not real shadcn Select.
+
+**Lesson repeated twice today:** green tests are not proof the page renders — a stale Vite
+optimize cache rendered every page blank while all 373 tests passed. Screenshot every
+surface after changing it.
+
+## Session handoff — 2026-10-12 (morning, branch pr-29)
 
 Everything below was verified in this session; start here before reading older sections.
 

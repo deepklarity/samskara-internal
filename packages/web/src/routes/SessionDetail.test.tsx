@@ -1977,15 +1977,17 @@ test("AI-9c: where the time went — a proportional strip with titled segments a
 
   const panel = panelOf()
   expect(within(panel).getByRole("heading", { name: /where the time went/i })).toBeInTheDocument()
-  expect(within(panel).getByTitle("Recovering the missing export · 95s")).toBeInTheDocument()
-  expect(within(panel).getByTitle("Kickoff · 10s")).toBeInTheDocument()
+  expect(
+    within(panel).getByTitle("Recovering the missing export · active 95s of 95s"),
+  ).toBeInTheDocument()
+  expect(within(panel).getByTitle("Kickoff · active 10s of 10s")).toBeInTheDocument()
   // Turning points carry the accent color; ordinary phases stay neutral.
-  expect(within(panel).getByTitle("Pivot: mine opencode.db instead · 71s").className).toContain(
-    "bg-stamp",
-  )
-  expect(within(panel).getByTitle("Recovering the missing export · 95s").className).not.toContain(
-    "bg-stamp",
-  )
+  expect(
+    within(panel).getByTitle("Pivot: mine opencode.db instead · active 71s of 71s").className,
+  ).toContain("bg-stamp")
+  expect(
+    within(panel).getByTitle("Recovering the missing export · active 95s of 95s").className,
+  ).not.toContain("bg-stamp")
   expect(
     within(panel).getByText(/95s of 184s — 52% — went to Recovering the missing export/),
   ).toBeInTheDocument()

@@ -39,7 +39,8 @@ const sessionSection = (meta: ReviewPromptOptions["sessionMeta"]): string[] => [
 ]
 
 const workspaceSection = (workspaceDir?: string): string[] => {
-  const at = (name: string): string => (workspaceDir === undefined ? `\`${name}\`` : `\`${workspaceDir}/${name}\``)
+  const at = (name: string): string =>
+    workspaceDir === undefined ? `\`${name}\`` : `\`${workspaceDir}/${name}\``
   return [
     "## Your working directory",
     "",

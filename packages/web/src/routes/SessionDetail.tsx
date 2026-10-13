@@ -343,23 +343,25 @@ const Masthead = ({ session, tokens }: { session: SessionFacts; tokens: TokenTot
 )
 
 const NotFound = ({ onBack }: { onBack: () => void }) => (
-  <Card className="border-stamp/40 bg-panel"><CardContent className="p-8 text-center">
-    <p className="text-label font-semibold text-stamp">Nothing on file</p>
-    <h2 className="mt-2 text-lead font-semibold">No such session</h2>
-    <p className="mx-auto mt-2 max-w-md text-ink-soft">
-      It either does not exist or has not been shared with you.
-    </p>
-    <Button type="button" onClick={onBack} className="mt-4">
-      Back to all sessions
-    </Button>
+  <Card className="border-stamp/40 bg-panel">
+    <CardContent className="p-8 text-center">
+      <p className="text-label font-semibold text-stamp">Nothing on file</p>
+      <h2 className="mt-2 text-lead font-semibold">No such session</h2>
+      <p className="mx-auto mt-2 max-w-md text-ink-soft">
+        It either does not exist or has not been shared with you.
+      </p>
+      <Button type="button" onClick={onBack} className="mt-4">
+        Back to all sessions
+      </Button>
     </CardContent>
   </Card>
 )
 
 const ErrorState = ({ error }: { error: ApiError }) => (
-  <Card className="border-err/40 bg-panel"><CardContent className="p-6">
-    <p className="text-label font-semibold text-err">Retrieval failed</p>
-    <p className="mt-2 text-ink-soft">{error.message}</p>
+  <Card className="border-err/40 bg-panel">
+    <CardContent className="p-6">
+      <p className="text-label font-semibold text-err">Retrieval failed</p>
+      <p className="mt-2 text-ink-soft">{error.message}</p>
     </CardContent>
   </Card>
 )
@@ -816,7 +818,7 @@ const TimeStrip = ({
                 STRIP_TONE[timelineTone(entry, failedSeqs, totalMs)] ?? STRIP_SEGMENT[entry.kind]
               }
               style={{ width: `${(activeSpanMs(entry) / segmentTotal) * 100}%` }}
-              title={`${displayReviewText(entry.title)} · ${formatSeconds(entry.durationMs ?? 0)}`}
+              title={`${displayReviewText(entry.title)} · active ${formatSeconds(activeSpanMs(entry))} of ${formatSeconds(entry.durationMs ?? 0)}`}
             />
           ))}
       </div>
@@ -878,11 +880,7 @@ const TimelineEntryRow = ({
   // "starts Ns in" produced values like "starts 1791349327s in". No session-start
   // epoch reaches this card, so no honest offset exists: the meta stays duration +
   // share + seq range.
-  const meta = [
-    entry.durationMs === undefined ? null : formatSeconds(entry.durationMs),
-    share,
-    `seq ${entry.fromSeq}–${entry.toSeq}`,
-  ]
+  const meta = [formatSeconds(activeSpanMs(entry)), share, `seq ${entry.fromSeq}–${entry.toSeq}`]
     .filter((part): part is string => part !== null)
     .join(" · ")
   const body = (
@@ -1256,13 +1254,21 @@ const ImprovementRow = ({
             </span>
           </summary>
           <ul className="mt-3 space-y-2 border-t border-rule pt-3 text-ink-soft">
-            {item.sessionEvidence.map((evidence) => (
-              <li key={`${evidence.seq}:${evidence.messageId}`}>
-                <Link to={linkFor(evidence.messageId) ?? "#"} className="underline">
-                  {displayReviewText(evidence.what) || "View conversation evidence"}
-                </Link>
-              </li>
-            ))}
+            {item.sessionEvidence.map((evidence) => {
+              const href = linkFor(evidence.messageId)
+              const label = displayReviewText(evidence.what) || "View conversation evidence"
+              return (
+                <li key={`${evidence.seq}:${evidence.messageId}`}>
+                  {href ? (
+                    <Link to={href} className="underline">
+                      {label}
+                    </Link>
+                  ) : (
+                    <span className="text-ink-soft">{label}</span>
+                  )}
+                </li>
+              )
+            })}
             {item.codeEvidence.map((citation) => (
               <li
                 key={`${citation.repo}:${citation.path}:${citation.revision}`}
@@ -1594,7 +1600,13 @@ const AiReviewCard = ({
           <PartialBanner partial={signals.partial} recovered={signals.run?.recovered ?? []} />
         )}
 
-        {entries.length === 0 ? null : (
+        {entries.length === 0 ? (
+          <p className="text-ink-soft">
+            {analysis.phase === "failed"
+              ? `Review failed — ${analysis.message}`
+              : "No timeline entries in this review"}
+          </p>
+        ) : (
           <>
             <TimeStrip entries={entries} totalMs={totalMs} failedSeqs={failedSeqs} />
             {review.analyzer === "ai-v2" ? (

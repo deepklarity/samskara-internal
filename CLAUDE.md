@@ -2,48 +2,148 @@
 
 Bun + Turborepo monorepo. Packages: `core` (ingest/domain), `server` (Hono + Drizzle + Postgres),
 `web` (React + Vite), `cli`. Tests are vitest; lint/format is biome. TDD — write the test first.
+This file is the entry point for every agent and human, on every harness. `AGENTS.md` just
+points here.
 
-## Subagents — parallel by default
+## Read before you act
 
-**The main conversation is a coordinator, not a worker.** Reserve it for synthesis, judgment,
-and decisions; delegate data-gathering, exploration, and well-specified implementation to
-subagents. Independent dispatches go out in one batch — sequential fan-out of independent work
-is the anti-pattern, in every phase (exploration, planning, implementation, verification).
+Before the action in the left column, open the file on the right. That is how a rule is
+never missed.
 
-- **Delegate**: "how does X work", file/area surveys, pattern discovery, writing tests to a
-  spec, implementing a well-scoped change. **Do directly**: anything whose output feeds the
-  very next judgment call, and single quick reads.
-- **Route by dispatch shape.** Two subagent mechanisms exist; the shape of the work picks
-  the lane:
-  - **Harness-native Task tool — the default.** Bounded work that fits one prompt and
-    returns one answer: exploration, surveys, research, test-writing waves, spec'd
-    implementation chunks. Fire-and-forget, batched in parallel, nothing to clean up.
-  - **Herdr-spawned panes — for work with a lifespan or an audience.** Long builds the
-    owner should be able to watch or join mid-run (takeover), cross-model deliberation,
-    lanes that must outlive the current session or take sequential briefings, and anything
-    likely to need interactive unblocking (a live pane can be read, re-prompted, and have
-    its questions answered in place).
-- **Detect the environment, then go.** The same rule serves both setups: run
-  `test "${HERDR_ENV:-}" = 1` once before dispatching. Inside Herdr, long-lifespan work
-  goes to a sibling pane via the `herdr` skill (AGENTS.md routes to it; read it before any
-  herdr command). Outside Herdr, everything routes through the harness Task tool — the
-  dispatch-shape rule above still applies, the pane lane just isn't available.
-- **GLM-5.3 is the default, MiniMax the second lane.** This machine runs opencode subagents
-  under two coding plans — default to `zai-coding-plan/glm-5.3` for almost everything
-  (judgment, design, roadmaps, synthesis, and implementation too); reach for
-  `minimax-coding-plan/MiniMax-M3` when you want a genuinely independent second opinion on
-  the same question, or a second parallel lane and GLM is already carrying the main one.
-  Pin the model on every subagent: in opencode, a herdr pane takes `--model` at
-  `agent start`; an unpinned dispatch inherits whatever context it landed in.
-- **Herdr hygiene** (inside Herdr only): number the tabs you create (`0 mc / …`, `1 …`) as
-  breadcrumbs, and **close what you opened** when its work is done — tabs and panes you
-  created, not the user's. Long-running shared infrastructure (the dev stack) is the
-  exception: it stays until the owner says stop.
-- **Test-first waves for TDD.** When a task is big enough to wave: one subagent writes the
-  failing tests (given requirements and patterns, no implementation context), the gate runs
-  them red, then implementation subagents get the failing tests. The information boundary is
-  the enforcement — that is why the dispatches are separate. Small or inherently sequential
-  tasks skip the wave and just do TDD inline.
+| About to | Open |
+|---|---|
+| Dispatch any subagent | **Agent delegation**, below — then `docs/playbook/subagents.md` for the model |
+| Control Herdr (panes, tabs, other agents) | `.claude/skills/herdr/SKILL.md` — read it before any `herdr` command |
+| Resume or update an initiative | `writeup/<initiative>/RESUME.md` first, `board.csv` wins on disagreement |
+| Debug a flow or ask "how does X work" | `docs/breadcrumb_analysis/_INDEX.md` — trace, don't guess |
+| Capture a reusable learning | `docs/patterns/` — append, never fork |
+| Run or write tests | `docs/testing_process/`, plus the TDD convention below |
+| Run the app, CLI or web UI | `README.md` |
+| Understand why the repo exists | `docs/project_understanding.md` |
+
+One fact lives in one place. When docs and reality diverge, fix the doc that is wrong —
+don't add a second copy that says something else.
+
+## Agent delegation — parallel by default
+
+**The main conversation is a coordinator, not a worker.** Reserve it for synthesis,
+judgment, decisions, and verification; delegate data-gathering, exploration, and
+well-specified implementation. Independent dispatches go out in one batch — sequential
+fan-out of independent work is the anti-pattern in every phase (exploration, planning,
+implementation, verification).
+
+- **Delegate**: "how does X work", file/area surveys, pattern discovery, writing tests to
+  a spec, implementing a well-scoped change. **Do directly**: anything whose output feeds
+  the very next judgment call, and single quick reads.
+- **Subagent guard.** If you are yourself a subagent, do the assigned work directly and
+  never spawn further subagents — this file is loaded by every agent, and without this
+  guard delegation recurses.
+
+### Two dispatch mechanisms — route by the shape of the work
+
+- **Harness-native Task tool — the default.** Bounded work that fits one prompt and
+  returns one answer: exploration, surveys, research, test-writing waves, spec'd
+  implementation chunks. Fire-and-forget, batched in parallel, nothing to clean up.
+- **Herdr-spawned panes — for work with a lifespan or an audience.** Long builds the
+  owner should be able to watch or join mid-run (takeover), cross-model deliberation,
+  lanes that must outlive the current session or take sequential briefings, and anything
+  likely to need interactive unblocking — a live pane can be read, re-prompted, and have
+  its questions answered in place.
+
+Detect the environment once with `test "${HERDR_ENV:-}" = 1`. Inside Herdr, long-lifespan
+work goes to a sibling pane; outside Herdr everything routes through the Task tool — the
+shape rule still applies, the pane lane just isn't available.
+
+### The Herdr dispatch loop
+
+**Layout: tabs, not panes.** Each dispatched agent gets its **own tab** (`herdr tab
+create`, then start the agent in the tab's root pane) — the owner's main view stays on
+this conversation. Never side-by-side panes by default. The only exception: work the
+owner should watch live gets **one** vertical split, never more.
+
+```bash
+# 1. a fresh tab per agent, same cwd
+herdr tab create --cwd "$PWD"          # note .result.tab and .result.root_pane
+# 2. start the agent in the tab's root pane, pinning the model — never later, never
+#    by asking it to switch
+herdr agent start impl-1 --kind opencode --pane "$PANE" -- \
+  --model opencode/nemotron-3.5-lightning-free
+# 3. brief it (worktrees: never tell it to create one — branch in place)
+herdr agent prompt impl-1 "<self-contained brief: files, spec, test command, done-criteria>"
+# 4. poll — an idle agent with an empty buffer means the prompt never landed: re-prompt.
+herdr agent wait impl-1 --timeout 600000   # then verify with agent read / agent list
+herdr agent read impl-1 --source visible   # its output, not its summary
+# 5. close what you opened when its work is done
+herdr tab close "$TAB"
+```
+
+- **Pin the model at start.** `--model` is a start flag; `/model` is a TUI action the
+  agent cannot perform and will stall on. Lane order and quota lore:
+  `docs/playbook/subagents.md`. Verify the pinned model took: `herdr agent read <name>
+  --source visible` — the status line names it.
+- **The brief is self-contained.** An agent pane sees nothing of your context: name the
+  files, the spec, the exact test/lint command, and what done looks like. It must never
+  create git worktrees, restart the dev stack mid-review, or run the full suite while
+  another agent holds it (see coordination note below).
+- **Trust, then verify.** Delegation on this machine has a failure mode: agents have
+  opened stale foreign contexts and left half-finished files (2026-10-12, log.md). So:
+  never merge an agent's self-reported "done" — run the scoped tests yourself in this
+  thread, and for UI work screenshot the real page; green tests are not proof the page
+  renders. Prefer dispatches whose done-criteria you can check mechanically.
+- **Coordination on one checkout.** With more than two agents writing code: one writer
+  per file, say which files each lane owns in its brief, and only one full suite at a
+  time. Commit or stash between waves so a bad lane is revertible.
+- **Hygiene.** Number tabs you create (`1 …`, `2 …`) as breadcrumbs, and **close what
+  you opened** when its work is done — tabs and panes you made, not the user's.
+  Long-running shared infrastructure (the dev stack) is the exception: it stays until
+  the owner says stop.
+
+### Test-first waves for TDD
+
+When a task is big enough to wave: one subagent writes the failing tests (given
+requirements and patterns, no implementation context), the gate runs them red, then
+implementation subagents receive the failing tests. The information boundary is the
+enforcement — that is why the dispatches are separate. Small or inherently sequential
+tasks skip the wave and just do TDD inline.
+
+## Durable state — the disk is the memory
+
+Sessions compact and end; anything that must survive belongs in a file.
+
+- **Each initiative gets `writeup/<initiative>/`**: `RESUME.md` (machine entry point),
+  `board.csv` (task state — wins over RESUME on disagreement), `log.md` (append-only,
+  one entry per session), and the rendered page. Update as you go, not at the end — a
+  tracker that lags the work is a bug. On "resume", read the tracker before acting.
+- **Breadcrumbs** for traced flows: `docs/breadcrumb_analysis/` (index:
+  `_INDEX.md`). **Compounded patterns**: `docs/patterns/`. Both are cross-initiative;
+  `writeup/` is per-initiative and never the home for reusable reference — promote
+  anything reusable into `docs/` (see `docs/playbook/subagents.md` for the pattern).
+- No `MEMORY.md` files. Persistent context lives in this file, `docs/`, or the tracker.
+
+## Commands that must not block the session
+
+**Foreground calls finish in seconds; never wait inside one.** No wait loops, no long
+timeouts on a foreground call — while one runs, the owner's messages cannot reach the
+session. Anything over about a minute (full suites, live reviews, migrations) runs
+backgrounded or in a subagent, writing to a log you check with two numbers: the log's
+last line and its age. No new output for ~3 minutes means stuck — find what it waits on,
+then kill it. Long ops are debugged by watching progress, not by waiting out a timeout:
+the milestone rules under "Long-running operations" below are mandatory reading before
+kicking one off.
+
+## Coding conventions
+
+- **Simplicity is a feature.** Between two correct approaches pick the one with fewer
+  moving parts. Abstraction layers and extensibility points are costs needing justification.
+- **Solve the actual problem.** Don't generalize from one instance. If the code feels
+  awkward, question the data model — the right fix is usually upstream of the symptom.
+- **No slop.** Generated code meets the hand-written bar: no filler comments, no
+  defensive boilerplate for impossible cases. Match surrounding naming and idiom.
+- **Methodical debugging.** Observe before acting; read the actual error. State the
+  hypothesis ("X because Y; changing Z should fix it because W"), change one thing at a
+  time, and if a fix fails twice the diagnosis is wrong: zoom out. Breadcrumb first.
+- **TDD**: test first for behavior changes; tests survive refactors — test behavior,
+  not implementation shape.
 
 ## New machine
 

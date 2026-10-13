@@ -11,6 +11,7 @@ import { join } from "node:path"
 import {
   type AiReviewPayload,
   type AiReviewPayloadV2,
+  type BreadcrumbLearning,
   buildReviewPrompt,
   buildReviewPromptV2,
   buildSessionExport,
@@ -27,6 +28,7 @@ import {
   reviewXmlTemplateV2,
   sessionIndexFrom,
   toolFailuresOf,
+  validateBreadcrumb,
   validateGrounding,
   validateGroundingV2,
 } from "@samskara/core"
@@ -502,6 +504,79 @@ export const runAiReview = async (
     }
     milestone("grounded")
 
+    // Server-side grounding/normalization pass: catch contract violations the model missed.
+    const normalizationRecovered: string[] = []
+
+    // 1. Breadcrumb guard: drop entries that are session-specific pointers (file paths,
+    // branch names, RESUME, PR numbers) — they violate the contract's strip-names test.
+    // Replace the entire breadcrumbs lens with a single "Nothing to change" entry carrying
+    // the contract's empty-section reason. This keeps the web read path simple: it still
+    // receives a breadcrumbs lens with one entry, and the reason is visible in the detail.
+    const breadcrumbLensIndex = payload.lenses.findIndex((lens) => lens.lens === "breadcrumbs")
+    if (breadcrumbLensIndex >= 0) {
+      const breadcrumbs = payload.lenses[breadcrumbLensIndex] as {
+        lens: "breadcrumbs"
+        learnings: BreadcrumbLearning[]
+      }
+      const hasSessionPointer = breadcrumbs.learnings.some(
+        (learning) => !validateBreadcrumb(learning as BreadcrumbLearning).ok,
+      )
+      if (hasSessionPointer) {
+        normalizationRecovered.push(
+          "breadcrumb guard: dropped session-pointer entries; replaced with nothing-to-change reason",
+        )
+        payload.lenses[breadcrumbLensIndex] = {
+          lens: "breadcrumbs",
+          learnings: [
+            {
+              title: "Nothing to change for breadcrumbs",
+              nextTime: "",
+              detail: "No breadcrumb earned a place: candidates were session-specific pointers",
+              category: "tool",
+              audience: "agent",
+              severity: "low",
+              evidence: [],
+            },
+          ],
+        }
+      }
+    }
+
+    // 2. toolFailures cross-check: if the session had tool failures but no agent learning
+    // mentions failure/tool/retry counts, attach a deterministic recovered note (same
+    // mechanism the XML parser uses for healing lines).
+    const toolFailures = toolFailuresOf(sessionExport.records)
+    const hasToolFailures = Object.keys(toolFailures).length > 0
+    const agentLensIndex = payload.lenses.findIndex((lens) => lens.lens === "agentLearnings")
+    const agentLearnsAboutFailures =
+      agentLensIndex >= 0 &&
+      (
+        payload.lenses[agentLensIndex] as {
+          lens: "agentLearnings"
+          learnings: Array<{ title: string; detail: string }>
+        }
+      ).learnings.some((learning) =>
+        /\b(?:failure|fail(?:ed|ure)?|tool\s+fail|retry\s+fail|error\s+count|bash\s+fail)\b/i.test(
+          learning.title + " " + learning.detail,
+        ),
+      )
+    if (hasToolFailures && !agentLearnsAboutFailures) {
+      normalizationRecovered.push(
+        "toolFailures cross-check: session had tool failures but no agent learning cites them",
+      )
+    }
+
+    // Fold normalization recoveries into the run's recovered ledger (persisted with the review).
+    milestones.push({
+      name: "normalized",
+      at: now().toISOString(),
+      elapsedMs: now().getTime() - startedAt.getTime(),
+    })
+    log.info(
+      { sessionId, normalized: normalizationRecovered },
+      "ai review normalization pass complete",
+    )
+
     // Numbers the model never gets to claim: session span and token totals from the detail
     // row, record/tool-call counts from the export the reviewer actually saw. The span SQL
     // yields ::bigint, which the driver hands back as a string — coerce, like the repo's
@@ -513,7 +588,7 @@ export const runAiReview = async (
       // Deterministic failure census from the same export: per-tool failure counts the
       // reviewer cites instead of recounting (real sessions fail Bash ~5% of calls and
       // almost nothing else — mined from 188 transcripts, 8511 calls, 2026-10-08).
-      toolFailures: toolFailuresOf(sessionExport.records),
+      toolFailures,
       inputTokens: detail.tokenUsage.inputTokens,
       outputTokens: detail.tokenUsage.outputTokens,
       cachedTokens: detail.tokenUsage.cachedTokens,
@@ -556,7 +631,7 @@ export const runAiReview = async (
       startedAt: startedAt.toISOString(),
       finishedAt: finishedAt.toISOString(),
       milestones: [...milestones],
-      recovered: [...parsed.recovered],
+      recovered: [...parsed.recovered, ...normalizationRecovered],
       ...(parsed.selfCounts === undefined ? {} : { selfCounts: parsed.selfCounts }),
       xmlBytes,
       agentLog: capAgentLog(runnerAgentLog ?? stdout),

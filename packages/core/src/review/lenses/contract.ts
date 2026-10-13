@@ -95,9 +95,28 @@ A breadcrumb is NOT:
 - a summary of what happened ("the rework landed as mergeable") — that is timeline;
 - a compliment or a restated learning — corrections belong in the two audiences above.
 
-Three strong breadcrumbs beat six thin ones. An empty breadcrumbs section with one line
-saying why nothing earned a place beats filler: filler teaches future sessions that
-breadcrumbs are noise, and then the good ones get ignored too.
+**Breadcrumbs that fail the strip test vs. ones that pass:**
+
+- FAILS: "Next-task lookup in the refactor RESUME file" — points at this session's
+  writeup/self-learning/RESUME.md; strip the session name and nothing reusable remains.
+- PASSES: "The psql query that lists failed jobs" — strip session specifics, the query
+  and its purpose remain; a future agent on any task can reuse it.
+
+**Session pointers — ALWAYS disqualify a breadcrumb:**
+
+- Any file path under the session's own writeup/ or docs/ workspace (e.g.
+  writeup/self-learning/RESUME.md, docs/architecture/decisions.md)
+- Any branch name token (feat/, fix/, chore/, refactor/, test/, docs/, style/,
+  perf/, ci/, build/, revert/, or PR-like tokens such as pr-29)
+- The phrase "the RESUME file" or "RESUME.md" — these point at this session's state
+
+Three strong breadcrumbs beat six thin ones. When zero breadcrumbs survive the strip
+test, write one entry titled "Nothing to change for breadcrumbs" with an empty nextTime
+and a detail line explaining why (for example: "All candidates pointed at
+session-specific files, branches, or the RESUME file; none survived the strip test.").
+An empty breadcrumbs section with one line saying why nothing earned a place beats
+filler: filler teaches future sessions that breadcrumbs are noise, and then the good
+ones get ignored too.
 
 A learning must name a change, not a compliment. "Keep doing what you did" is not a
 learning — if a behavior was right, say so in the summary and write the "Nothing to
@@ -134,6 +153,12 @@ fit, say so in the summary instead of stretching one.
   error. Look for error results on the same tool and count them per tool in the learning. The
   run's numbers carry the same per-tool counts — cite them instead of recounting.
   Feeds agentLearnings.
+- Tool-failure checklist — when the run's numbers carry nonzero toolFailures, the
+  agentLearnings lens MUST either (a) include a learning that cites the per-tool failure
+  counts from the run's numbers, or (b) contain a "Nothing to change for the agent" entry
+  whose detail explicitly states why no tool-failure learning was warranted (for example:
+  "Tool failures occurred but were all transient network errors; no process change needed.").
+  A review with toolFailures > 0 and no such agent learning is incomplete.
 - Started from an unclear task — the request had two meanings and the agent picked one
   without asking. Look for the first message carrying two possible readings and no
   clarifying question after it. Feeds humanLearnings.

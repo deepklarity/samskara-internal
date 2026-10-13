@@ -1219,8 +1219,8 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     expect(runWithIds.recordIds?.every((id) => typeof id === "string" && id !== "")).toBe(true)
 
     const names = run.milestones.map((milestone) => milestone.name)
-    // Existing milestone names keep working (scripts/ai-review-watch.sh greps them); the two
-    // new ones are additive.
+    // Existing milestone names keep working (scripts/ai-review-watch.sh greps them); new ones
+    // are additive — the normalization pass runs after grounding.
     expect(names).toEqual([
       "workspace_ready",
       "export_written",
@@ -1233,6 +1233,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
       "deliverable_read",
       "xml_parsed",
       "grounded",
+      "normalized",
     ])
     for (const milestone of run.milestones) {
       expect(new Date(milestone.at).toISOString()).toBe(milestone.at)
@@ -1251,5 +1252,90 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     )
     expect(line).toBeDefined()
     expect((line as { bytes?: number }).bytes).toBe(Buffer.byteLength(file))
+  })
+
+  test("breadcrumb guard: session-pointer breadcrumbs are replaced with nothing-to-change entry", async () => {
+    const payload = validPayload(sessionExport.index)
+    // Mutate breadcrumbs to include session-pointer entries that violate the strip-names test
+    const breadcrumbsLens = payload.lenses.find((l) => l.lens === "breadcrumbs") as {
+      lens: "breadcrumbs"
+      learnings: Array<FixtureLearning>
+    }
+    breadcrumbsLens.learnings = [
+      {
+        title: "PR-29 branch lookup",
+        detail: "The git branch feat/pr-29-instrument-state has the query we need.",
+        nextTime: "Check that branch first.",
+        category: "query",
+        audience: "agent",
+        severity: "low",
+        evidence: [{ seq: 1, messageId: "msg-1", what: "branch mentioned" }],
+      },
+      {
+        title: "RESUME file path",
+        detail: "The file /workspace/samskara/writeup/self-learning/RESUME.md has the context.",
+        nextTime: "Read that file next time.",
+        category: "path",
+        audience: "agent",
+        severity: "low",
+        evidence: [{ seq: 1, messageId: "msg-1", what: "file path mentioned" }],
+      },
+    ]
+    const xml = xmlOf(payload)
+    const { runner } = fakeRunner(() => ({ stdout: "ready", file: xml }))
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+
+    const signals = await persistedSignals()
+    const breadcrumbsLensPersisted = (
+      signals.lenses as ReadonlyArray<{
+        lens: string
+        learnings?: ReadonlyArray<{ title: string; detail: string }>
+      }>
+    ).find((l) => l.lens === "breadcrumbs")
+    expect(breadcrumbsLensPersisted).toBeDefined()
+    // Should have exactly one "Nothing to change" entry with the contract's reason
+    expect(breadcrumbsLensPersisted?.learnings).toHaveLength(1)
+    const only = breadcrumbsLensPersisted?.learnings?.[0]
+    expect(only?.title).toBe("Nothing to change for the agent")
+    expect(only?.detail).toBe(
+      "No breadcrumb earned a place: candidates were session-specific pointers",
+    )
+  })
+
+  test("toolFailures cross-check: nonempty toolFailures with no agent learning about failures adds recovered note", async () => {
+    const payload = validPayload(sessionExport.index)
+    // Ensure agentLearnings has NO mention of failure/tool/retry
+    const agentLens = payload.lenses.find((l) => l.lens === "agentLearnings") as {
+      lens: "agentLearnings"
+      learnings: Array<FixtureLearning>
+    }
+    agentLens.learnings = [
+      {
+        title: "Use a different approach",
+        detail: "The agent should have tried a different strategy.",
+        nextTime: "Try a different approach first.",
+        category: "approach",
+        audience: "agent",
+        severity: "low",
+        evidence: [{ seq: 1, messageId: "msg-1", what: "the approach used" }],
+      },
+    ]
+    // The fixture session has toolFailures: { bash: 1 } (from the failed Bash call)
+    const xml = xmlOf(payload)
+    const { runner } = fakeRunner(() => ({ stdout: "ready", file: xml }))
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result.kind).toBe("ok")
+    if (result.kind !== "ok") return
+
+    const signals = await persistedSignals()
+    const run = signals.run as { recovered: ReadonlyArray<string> }
+    // Should have a recovered note about the toolFailures cross-check
+    expect(
+      run.recovered.some(
+        (note) => note.includes("toolFailures") && note.includes("agent learning"),
+      ),
+    ).toBe(true)
   })
 })
