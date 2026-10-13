@@ -82,10 +82,7 @@ describe("createOpencodeRunner", () => {
   test("R1b: the soft runner passes --dir so the reviewer lands in the workspace, not the ambient project", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-runner-dir-"))
     const script = join(workspaceDir, "fake-opencode.sh")
-    writeFileSync(
-      script,
-      ["#!/usr/bin/env bash", 'echo "args: $*"'].join("\n"),
-    )
+    writeFileSync(script, ["#!/usr/bin/env bash", 'echo "args: $*"'].join("\n"))
     chmodSync(script, 0o755)
 
     const runner = createOpencodeRunner({
@@ -227,7 +224,8 @@ describe("createClaudeRunner", () => {
     })
   })
 
-  test("R5: a hanging command rejects timedOut carrying stderr (SIGTERM then SIGKILL)", async () => {    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-hang-test-"))
+  test("R5: a hanging command rejects timedOut carrying stderr (SIGTERM then SIGKILL)", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "samskara-hang-test-"))
     const script = join(workspaceDir, "hanging.sh")
     // exec: the process IS sleep, so SIGTERM kills it at once. Without exec, bash
     // would wait out the child and the escalation would take the full 30s.
@@ -428,7 +426,8 @@ describe("createMsbWrappedRunner", () => {
     expect(shell).toContain("--model 'x; evil'")
   })
 
-  test("MR2: buildMsbArgs caps the msb --timeout with a fixed safety margin", () => {    const args = buildMsbArgs({
+  test("MR2: buildMsbArgs caps the msb --timeout with a fixed safety margin", () => {
+    const args = buildMsbArgs({
       model: "x",
       timeoutMs: 60_000,
       image: "node:22-slim",

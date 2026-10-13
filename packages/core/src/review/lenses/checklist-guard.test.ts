@@ -2,6 +2,22 @@ import { describe, expect, test } from "vitest"
 import { type ToolFailureChecklistResult, validateToolFailureChecklist } from "./checklist-guard.js"
 import type { AgentLearning, AiReviewPayload } from "./schema.js"
 
+const timelineLens: AiReviewPayload["lenses"][number] = {
+  lens: "timeline",
+  entries: [
+    {
+      id: "exploration",
+      kind: "phase",
+      title: "Exploration",
+      summary: "Initial exploration",
+      fromSeq: 0,
+      toSeq: 5,
+      messageIds: ["msg-0", "msg-1"],
+      tracks: ["main"],
+    },
+  ],
+}
+
 const basePayload = (overrides: Partial<AiReviewPayload> = {}): AiReviewPayload => ({
   analyzer: "ai-v1",
   model: "test-model",
@@ -10,21 +26,7 @@ const basePayload = (overrides: Partial<AiReviewPayload> = {}): AiReviewPayload 
   friction: "none",
   summary: "Test session",
   lenses: [
-    {
-      lens: "timeline",
-      entries: [
-        {
-          id: "exploration",
-          kind: "phase",
-          title: "Exploration",
-          summary: "Initial exploration",
-          fromSeq: 0,
-          toSeq: 5,
-          messageIds: ["msg-0", "msg-1"],
-          tracks: ["main"],
-        },
-      ],
-    },
+    timelineLens,
     { lens: "humanLearnings", learnings: [] },
     { lens: "agentLearnings", learnings: [] },
     { lens: "breadcrumbs", learnings: [] },
@@ -53,7 +55,7 @@ describe("validateToolFailureChecklist", () => {
   test("passes when toolFailures > 0 and agentLearnings cites per-tool counts", () => {
     const payload = basePayload({
       lenses: [
-        basePayload().lenses[0]!,
+        timelineLens,
         { lens: "humanLearnings", learnings: [] },
         {
           lens: "agentLearnings",
@@ -77,7 +79,7 @@ describe("validateToolFailureChecklist", () => {
   test("passes when toolFailures > 0 and agentLearnings has explicit nothing-entry with reason", () => {
     const payload = basePayload({
       lenses: [
-        basePayload().lenses[0]!,
+        timelineLens,
         { lens: "humanLearnings", learnings: [] },
         {
           lens: "agentLearnings",
@@ -102,7 +104,7 @@ describe("validateToolFailureChecklist", () => {
   test("fails when toolFailures > 0 and agentLearnings is empty", () => {
     const payload = basePayload({
       lenses: [
-        basePayload().lenses[0]!,
+        timelineLens,
         { lens: "humanLearnings", learnings: [] },
         { lens: "agentLearnings", learnings: [] },
         { lens: "breadcrumbs", learnings: [] },
@@ -118,7 +120,7 @@ describe("validateToolFailureChecklist", () => {
   test("fails when toolFailures > 0 and agentLearnings has learning but doesn't cite tool failures", () => {
     const payload = basePayload({
       lenses: [
-        basePayload().lenses[0]!,
+        timelineLens,
         { lens: "humanLearnings", learnings: [] },
         {
           lens: "agentLearnings",
@@ -143,7 +145,7 @@ describe("validateToolFailureChecklist", () => {
   test("fails when toolFailures > 0 and agentLearnings has nothing-entry without tool-failure reason", () => {
     const payload = basePayload({
       lenses: [
-        basePayload().lenses[0]!,
+        timelineLens,
         { lens: "humanLearnings", learnings: [] },
         {
           lens: "agentLearnings",
@@ -170,7 +172,7 @@ describe("validateToolFailureChecklist", () => {
   test("fails when toolFailures > 0 and agentLearnings learning mentions 'tool' but not per-tool counts", () => {
     const payload = basePayload({
       lenses: [
-        basePayload().lenses[0]!,
+        timelineLens,
         { lens: "humanLearnings", learnings: [] },
         {
           lens: "agentLearnings",
@@ -195,7 +197,7 @@ describe("validateToolFailureChecklist", () => {
   test("passes when toolFailures > 0 and learning cites per-tool counts with tool names and numbers", () => {
     const payload = basePayload({
       lenses: [
-        basePayload().lenses[0]!,
+        timelineLens,
         { lens: "humanLearnings", learnings: [] },
         {
           lens: "agentLearnings",

@@ -519,15 +519,16 @@ const readFailedMsbTrace = async (
  * under ~/.microsandbox forever. Safe at startup because the job registry is in-memory
  * — no review can be running yet. Best-effort: msb missing (CI) only logs.
  */
-export const reapStaleReviewSandboxes = async (
-  msbBin: string,
-  log: pino.Logger,
-): Promise<void> => {
+export const reapStaleReviewSandboxes = async (msbBin: string, log: pino.Logger): Promise<void> => {
   try {
-    await execFileAsync(msbBin, ["remove", "--force", "--quiet", "--label", `${MSB_REVIEW_LABEL}=true`], {
-      timeout: 30_000,
-      maxBuffer: 64 * 1024,
-    })
+    await execFileAsync(
+      msbBin,
+      ["remove", "--force", "--quiet", "--label", `${MSB_REVIEW_LABEL}=true`],
+      {
+        timeout: 30_000,
+        maxBuffer: 64 * 1024,
+      },
+    )
     log.info("reaped stale ai review sandboxes")
   } catch (error) {
     log.warn(
