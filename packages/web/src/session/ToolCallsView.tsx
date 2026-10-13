@@ -33,7 +33,7 @@ export const ToolCallsView = ({ calls, agentOf }: Props) => {
     <div className="max-w-[1200px]">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3 border-b border-rule pb-3">
         <div>
-          <h2 className="text-[0.9375rem] font-semibold">Tool calls</h2>
+          <h2 className="text-lead font-semibold">Tool calls</h2>
           <p className="max-w-[72ch] text-ink-soft">
             Inputs and captured outputs, grouped as individual procedures.
           </p>

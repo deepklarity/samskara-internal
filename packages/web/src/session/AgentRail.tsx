@@ -95,9 +95,7 @@ export const AgentRail = ({ entries, selectedId, onSelect }: Props) => (
     // route. Parking under it is what keeps the first agent visible rather than behind them.
     className="min-w-0 min-[900px]:sticky min-[900px]:top-[calc(var(--sticky-head,0px)_+_1rem)] min-[900px]:max-h-[calc(100dvh_-_var(--sticky-head,0px)_-_2rem)] min-[900px]:self-start min-[900px]:overflow-y-auto min-[900px]:pr-1"
   >
-    <h2 className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-faded">
-      Agents · {entries.length}
-    </h2>
+    <h2 className="text-label font-semibold text-faded">Agents · {entries.length}</h2>
 
     <div className="mt-2 grid gap-2 min-[900px]:block">
       {entries.map((entry) => {

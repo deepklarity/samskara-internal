@@ -13,9 +13,7 @@ type State =
 const READY: State = { phase: "ready" }
 
 const Label = ({ children }: { children: string }) => (
-  <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft">
-    {children}
-  </p>
+  <p className="text-label font-semibold text-ink-soft">{children}</p>
 )
 
 const CodePanel = ({ code }: { code: string }) => {
@@ -97,7 +95,7 @@ export const PairingDialog = ({ open, onClose, restoreFocusTo }: Props) => {
         aria-labelledby="pairing-dialog-title"
         className="relative w-full max-w-md border border-rule bg-panel-2 p-6 text-ink shadow-overlay"
       >
-        <h2 id="pairing-dialog-title" className="text-[1.375rem] font-semibold leading-tight">
+        <h2 id="pairing-dialog-title" className="text-case-title font-semibold leading-tight">
           Pair the CLI
         </h2>
         <p className="mt-2 text-ink-soft">

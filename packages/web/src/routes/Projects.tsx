@@ -3,6 +3,7 @@ import { type ApiError, client, request } from "../api/client.js"
 import type { ProjectSummary } from "../api/types.js"
 import { SessionExpired } from "../auth/SessionExpired.js"
 import { ProjectCard } from "../components/ProjectCard.js"
+import { Card, CardContent } from "../components/ui/card.js"
 import { LoadingShell } from "../shell/LoadingShell.js"
 
 type Loaded = { readonly projects: ReadonlyArray<ProjectSummary> }
@@ -13,26 +14,26 @@ type State =
   | { readonly phase: "failed"; readonly error: ApiError }
 
 const EmptyState = () => (
-  <section className="border border-dashed border-rule bg-panel p-8 text-center">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-      No case files yet
-    </p>
-    <h2 className="mt-2 text-[0.9375rem] font-semibold">Nothing has been filed here</h2>
-    <p className="mx-auto mt-2 max-w-md text-ink-soft">
-      Send your first capture from the CLI and this shelf fills itself. Run{" "}
-      <code className="font-mono text-[0.78rem] text-custody">samskara capture</code> inside a
-      project to file its sessions.
-    </p>
-  </section>
+  <Card className="border-dashed bg-panel">
+    <CardContent className="p-8 text-center">
+      <p className="text-label font-semibold text-stamp">No case files yet</p>
+      <h2 className="mt-2 text-lead font-semibold">Nothing has been filed here</h2>
+      <p className="mx-auto mt-2 max-w-md text-ink-soft">
+        Send your first capture from the CLI and this shelf fills itself. Run{" "}
+        <code className="font-mono text-[0.78rem] text-custody">samskara capture</code> inside a
+        project to file its sessions.
+      </p>
+    </CardContent>
+  </Card>
 )
 
 const ErrorState = ({ error }: { error: ApiError }) => (
-  <section className="border border-err/40 bg-panel p-6">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
-      Retrieval failed
-    </p>
-    <p className="mt-2 text-ink-soft">{error.message}</p>
-  </section>
+  <Card className="border-err/40 bg-panel">
+    <CardContent className="p-6">
+      <p className="text-label font-semibold text-err">Retrieval failed</p>
+      <p className="mt-2 text-ink-soft">{error.message}</p>
+    </CardContent>
+  </Card>
 )
 
 export const Projects = () => {
@@ -64,7 +65,7 @@ export const Projects = () => {
 
   return (
     <section>
-      <h1 className="text-[1.375rem] font-semibold leading-tight">Projects</h1>
+      <h1 className="text-case-title font-semibold leading-tight">Projects</h1>
       <ul className="mt-4 grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 min-[840px]:grid-cols-3">
         {state.projects.map((project) => (
           <li key={project.id}>

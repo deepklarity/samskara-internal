@@ -1,4 +1,5 @@
 import { LocalSecretForm, useAuthMethods } from "../auth/LocalSignIn.js"
+import { Card } from "../components/ui/card.js"
 import { BuildStamp } from "../shell/BuildStamp.js"
 
 type Props = { readonly onLocalSignedIn?: (path: string) => void }
@@ -97,7 +98,7 @@ const AccessColumn = ({ onLocalSignedIn }: Props) => {
   return (
     <section className="relative flex flex-col justify-center px-6 py-14 sm:px-10 lg:px-14">
       <div aria-hidden="true" className="ledger-ground pointer-events-none absolute inset-0" />
-      <div className="animate-file-in relative mx-auto w-full max-w-[23rem] border border-rule bg-panel-2 p-8 shadow-card">
+      <Card className="animate-file-in relative mx-auto w-full max-w-[23rem] bg-panel-2 p-8">
         <h2 className="text-case-title">Sign in</h2>
         <div aria-hidden="true" className="mt-4 h-[2px] w-10 bg-stamp" />
         <p className="mt-5 text-lead text-ink-soft">
@@ -115,7 +116,7 @@ const AccessColumn = ({ onLocalSignedIn }: Props) => {
         ) : null}
 
         {methods.local ? <LocalSecretForm onSignedIn={onLocalSignedIn} /> : null}
-      </div>
+      </Card>
 
       <BuildStamp className="relative mx-auto mt-6 w-full max-w-[23rem] justify-end" />
     </section>

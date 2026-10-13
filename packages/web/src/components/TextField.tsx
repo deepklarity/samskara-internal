@@ -7,8 +7,7 @@ import { type ReactNode, useId } from "react"
  */
 export const controlClass =
   "mt-1 h-9 w-full min-w-0 rounded-xs border border-rule bg-panel-2 px-2 font-mono text-[0.78rem] leading-none text-ink transition-colors hover:border-ink-soft focus-visible:border-custody"
-export const labelClass =
-  "block text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft"
+export const labelClass = "block text-label font-semibold text-ink-soft"
 
 type Props = {
   readonly label: string

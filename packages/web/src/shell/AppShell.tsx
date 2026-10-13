@@ -34,7 +34,7 @@ export const AppShell = ({ children }: { children: ReactNode }) => {
       <header className="border-b border-rule bg-panel-2/80 px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-6 gap-y-2 max-sm:contents">
-            <Link to="/projects" className="shrink-0 text-[1.375rem] font-semibold leading-tight">
+            <Link to="/projects" className="shrink-0 text-case-title font-semibold leading-tight">
               samskara
             </Link>
             {user ? (

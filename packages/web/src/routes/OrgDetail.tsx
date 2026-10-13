@@ -4,6 +4,8 @@ import { Link, useParams } from "react-router-dom"
 import { type ApiError, client, request } from "../api/client.js"
 import type { OrgDetail as OrgDetailPayload } from "../api/types.js"
 import { SessionExpired } from "../auth/SessionExpired.js"
+import { Button } from "../components/ui/button.js"
+import { Card } from "../components/ui/card.js"
 import { LoadingShell } from "../shell/LoadingShell.js"
 
 type State =
@@ -36,18 +38,14 @@ const patchFailureMessage = (result: PatchResult): string | null => {
 
 const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="min-w-0">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft">
-      {label}
-    </p>
+    <p className="text-label font-semibold text-ink-soft">{label}</p>
     <p className="truncate font-mono text-[0.9375rem]">{children}</p>
   </div>
 )
 
 const ErrorState = ({ error }: { error: ApiError }) => (
   <section className="border border-err/40 bg-panel p-6">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
-      Retrieval failed
-    </p>
+    <p className="text-label font-semibold text-err">Retrieval failed</p>
     <p className="mt-2 text-ink-soft">{error.message}</p>
   </section>
 )
@@ -140,7 +138,7 @@ export const OrgDetail = () => {
 
   return (
     <section>
-      <h1 className="text-[1.375rem] font-semibold leading-tight">
+      <h1 className="text-case-title font-semibold leading-tight">
         {settings?.saved.name ?? org.name}
       </h1>
       {(settings?.saved.name ?? org.name) === org.githubSlug ? null : (
@@ -151,14 +149,14 @@ export const OrgDetail = () => {
       <div
         role="group"
         aria-label="Org totals"
-        className="mt-4 grid grid-cols-2 gap-4 border border-rule bg-panel-2 p-4 shadow-card min-[560px]:grid-cols-4"
+        className="mt-4 grid grid-cols-2 gap-4 bg-panel-2 p-4 min-[560px]:grid-cols-4"
       >
         <Field label="Sessions">{org.sessionCount}</Field>
         <Field label="Members">{org.members.length}</Field>
         <Field label="Projects">{org.projects.length}</Field>
       </div>
 
-      <h2 className="mt-6 text-[0.9375rem] font-semibold">Projects</h2>
+      <h2 className="mt-6 text-lead font-semibold">Projects</h2>
       {org.projects.length === 0 ? (
         <p className="mt-2 border border-rule-soft bg-panel p-4 text-ink-soft">
           This org owns no projects yet. A project becomes the org's when someone runs{" "}
@@ -169,9 +167,9 @@ export const OrgDetail = () => {
         <ul className="mt-4 grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 min-[840px]:grid-cols-3">
           {org.projects.map((project) => (
             <li key={project.id}>
-              <article className="flex w-full flex-col gap-3 border border-rule bg-panel-2 p-4 shadow-card transition-colors focus-within:border-ink-soft hover:border-ink-soft">
+              <Card className="flex w-full flex-col gap-3 bg-panel-2 p-4 transition-colors focus-within:border-ink-soft hover:border-ink-soft">
                 <div className="min-w-0">
-                  <h3 className="truncate text-[0.9375rem] font-semibold">
+                  <h3 className="truncate text-lead font-semibold">
                     <Link
                       to={`/projects/${encodeURIComponent(project.id)}`}
                       className="hover:underline"
@@ -190,13 +188,13 @@ export const OrgDetail = () => {
                     View sessions
                   </Link>
                 )}
-              </article>
+              </Card>
             </li>
           ))}
         </ul>
       )}
 
-      <h2 className="mt-6 text-[0.9375rem] font-semibold">Members</h2>
+      <h2 className="mt-6 text-lead font-semibold">Members</h2>
       {org.members.length === 0 ? (
         <p className="mt-2 border border-rule-soft bg-panel p-4 text-ink-soft">
           Nobody has signed in from this org yet.
@@ -219,12 +217,12 @@ export const OrgDetail = () => {
 
       {settings === null ? null : (
         <>
-          <h2 className="mt-8 text-[0.9375rem] font-semibold">Settings</h2>
+          <h2 className="mt-8 text-lead font-semibold">Settings</h2>
           <div className="mt-2 border border-rule-soft bg-panel">
             <div className="border-b border-rule-soft p-4">
               <label
                 htmlFor="org-name-input"
-                className="block text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft"
+                className="block text-label font-semibold text-ink-soft"
               >
                 Display name
               </label>
@@ -265,14 +263,14 @@ export const OrgDetail = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 p-4">
-              <button
+              <Button
                 type="button"
                 onClick={save}
                 disabled={settings.pending || !dirty}
-                className="min-h-11 border border-rule bg-panel-2 px-4 py-2 text-[0.78rem] font-semibold disabled:opacity-60"
+                className="min-h-11"
               >
                 {settings.pending ? "Saving…" : "Save"}
-              </button>
+              </Button>
               {dirty && !settings.pending ? (
                 <button
                   type="button"
@@ -283,9 +281,7 @@ export const OrgDetail = () => {
                 </button>
               ) : null}
               {settings.acknowledged && !dirty ? (
-                <output className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ok">
-                  Saved
-                </output>
+                <output className="text-label font-semibold text-ok">Saved</output>
               ) : null}
             </div>
 

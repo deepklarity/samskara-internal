@@ -89,10 +89,9 @@ test("SC1b: every project session is listed, not just the first few", async () =
       )
     }
     return Promise.resolve(
-      new Response(
-        JSON.stringify({ sessions, pagination: { page: 1, limit: 100, total: 24 } }),
-        { status: 200 },
-      ),
+      new Response(JSON.stringify({ sessions, pagination: { page: 1, limit: 100, total: 24 } }), {
+        status: 200,
+      }),
     )
   })
 

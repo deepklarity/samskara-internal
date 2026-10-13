@@ -20,18 +20,14 @@ type State =
 
 const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="min-w-0">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft">
-      {label}
-    </p>
+    <p className="text-label font-semibold text-ink-soft">{label}</p>
     <p className="truncate font-mono text-[0.9375rem]">{children}</p>
   </div>
 )
 
 const ErrorState = ({ error }: { error: ApiError }) => (
   <section className="border border-err/40 bg-panel p-6">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
-      Retrieval failed
-    </p>
+    <p className="text-label font-semibold text-err">Retrieval failed</p>
     <p className="mt-2 text-ink-soft">{error.message}</p>
   </section>
 )
@@ -101,7 +97,7 @@ export const ProjectDetail = () => {
 
   return (
     <section>
-      <h1 className="text-[1.375rem] font-semibold leading-tight">{project.name}</h1>
+      <h1 className="text-case-title font-semibold leading-tight">{project.name}</h1>
       <div className="mt-4 grid grid-cols-2 gap-4 border border-rule bg-panel-2 p-4 shadow-card min-[560px]:grid-cols-4">
         <Field label="Slug">{project.slug}</Field>
         <Field label="Owner">
@@ -115,7 +111,7 @@ export const ProjectDetail = () => {
         <Field label="Sessions">{project.sessionCount}</Field>
       </div>
       <div className="mt-6 flex items-baseline justify-between gap-4">
-        <h2 className="text-[0.9375rem] font-semibold">Sessions</h2>
+        <h2 className="text-lead font-semibold">Sessions</h2>
         {project.sessionCount > 0 ? (
           <Link
             to={`/sessions?project=${encodeURIComponent(project.id)}`}
@@ -161,9 +157,7 @@ export const ProjectDetail = () => {
 
       {viewerCanDelete ? (
         <div className="mt-8 border border-err/40 bg-panel p-4">
-          <h2 className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
-            Delete this project
-          </h2>
+          <h2 className="text-label font-semibold text-err">Delete this project</h2>
           <p className="mt-1 text-ink-soft">
             Removes the project and every session captured in it. This cannot be undone.
           </p>

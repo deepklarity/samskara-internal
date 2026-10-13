@@ -34,22 +34,22 @@ const NoResults = ({
 }) => (
   <Card className={panelClass}>
     <CardContent className="p-8 text-center">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-      {hasFilters ? "Nothing filed under these terms" : "No sessions captured"}
-    </p>
-    <h2 className="mt-2 text-[0.9375rem] font-semibold">
-      {hasFilters ? "No sessions match these filters" : "There are no sessions to review yet"}
-    </h2>
-    <p className="mx-auto mt-2 max-w-md text-ink-soft">
-      {hasFilters
-        ? "The filters above are still applied. Widen them, or clear them to see every session you can read."
-        : "Captured sessions will appear here once they are available to you."}
-    </p>
-    {hasFilters ? (
-      <Button type="button" onClick={onClear} className={primaryButtonClass}>
-        Clear filters
-      </Button>
-    ) : null}
+      <p className="text-label font-semibold text-stamp">
+        {hasFilters ? "Nothing filed under these terms" : "No sessions captured"}
+      </p>
+      <h2 className="mt-2 text-lead font-semibold">
+        {hasFilters ? "No sessions match these filters" : "There are no sessions to review yet"}
+      </h2>
+      <p className="mx-auto mt-2 max-w-md text-ink-soft">
+        {hasFilters
+          ? "The filters above are still applied. Widen them, or clear them to see every session you can read."
+          : "Captured sessions will appear here once they are available to you."}
+      </p>
+      {hasFilters ? (
+        <Button type="button" onClick={onClear} className={primaryButtonClass}>
+          Clear filters
+        </Button>
+      ) : null}
     </CardContent>
   </Card>
 )
@@ -57,16 +57,14 @@ const NoResults = ({
 const Denied = ({ onReset }: { readonly onReset: () => void }) => (
   <Card className="border-stamp/40 bg-panel p-8 text-center">
     <CardContent className="p-0 text-center">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-      Access withheld
-    </p>
-    <h2 className="mt-2 text-[0.9375rem] font-semibold">That project cannot be opened</h2>
-    <p className="mx-auto mt-2 max-w-md text-ink-soft">
-      It either does not exist or has not been shared with you.
-    </p>
-    <Button type="button" onClick={onReset} className={primaryButtonClass}>
-      Back to all sessions
-    </Button>
+      <p className="text-label font-semibold text-stamp">Access withheld</p>
+      <h2 className="mt-2 text-lead font-semibold">That project cannot be opened</h2>
+      <p className="mx-auto mt-2 max-w-md text-ink-soft">
+        It either does not exist or has not been shared with you.
+      </p>
+      <Button type="button" onClick={onReset} className={primaryButtonClass}>
+        Back to all sessions
+      </Button>
     </CardContent>
   </Card>
 )
@@ -88,20 +86,22 @@ const ErrorState = ({ error }: { readonly error: ApiError }) => {
   const ambiguous = error.code === "ambiguousCommit"
   return (
     <Card className="border-err/40 bg-panel p-6" role="alert">
-      <CardContent className="p-0">      <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
-        {ambiguous
-          ? "Commit prefix is ambiguous"
-          : invalid
-            ? "Check your search or filter"
-            : "Retrieval failed"}
-      </p>
-      <p className="mt-2 text-ink-soft">
-        {ambiguous
-          ? "Use more of the commit SHA to identify one authorized commit."
-          : invalid
-            ? "The search or filter format is not valid. Update it and try again."
-            : error.message}
-      </p>
+      <CardContent className="p-0">
+        {" "}
+        <p className="text-label font-semibold text-err">
+          {ambiguous
+            ? "Commit prefix is ambiguous"
+            : invalid
+              ? "Check your search or filter"
+              : "Retrieval failed"}
+        </p>
+        <p className="mt-2 text-ink-soft">
+          {ambiguous
+            ? "Use more of the commit SHA to identify one authorized commit."
+            : invalid
+              ? "The search or filter format is not valid. Update it and try again."
+              : error.message}
+        </p>
       </CardContent>
     </Card>
   )
@@ -261,7 +261,7 @@ export const Sessions = () => {
 
   return (
     <section>
-      <h1 className="text-[1.375rem] font-semibold leading-tight">Sessions</h1>
+      <h1 className="text-case-title font-semibold leading-tight">Sessions</h1>
       <div className="mt-4">
         <FilterBar
           filters={filters}

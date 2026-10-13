@@ -196,9 +196,7 @@ const Notice = ({
   <div
     className={`border border-dashed p-4 ${tone === "err" ? "border-err/50 bg-panel" : "border-faded bg-panel"}`}
   >
-    <p
-      className={`text-[0.656rem] font-semibold uppercase tracking-[0.12em] ${tone === "err" ? "text-err" : "text-faded"}`}
-    >
+    <p className={`text-label font-semibold ${tone === "err" ? "text-err" : "text-faded"}`}>
       {title}
     </p>
     <p className="mt-2 text-ink-soft">{children}</p>
@@ -300,15 +298,11 @@ const SideBySide = ({
 }) => (
   <div className="grid grid-cols-1 gap-3 min-[900px]:grid-cols-2">
     <section className="min-w-0">
-      <h4 className="mb-1 text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft">
-        Before
-      </h4>
+      <h4 className="mb-1 text-label font-semibold text-ink-soft">Before</h4>
       <Code source={base} path={path} wrap={wrap} />
     </section>
     <section className="min-w-0">
-      <h4 className="mb-1 text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft">
-        After
-      </h4>
+      <h4 className="mb-1 text-label font-semibold text-ink-soft">After</h4>
       <Code source={current} path={path} wrap={wrap} />
     </section>
   </div>
@@ -549,9 +543,7 @@ const Viewer = ({
   <section aria-label="Artifact viewer" className="min-w-0 bg-panel-2">
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-rule bg-panel px-4 py-3">
       <div className="min-w-0">
-        <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft">
-          {kindOf(exhibit)}
-        </p>
+        <p className="text-label font-semibold text-ink-soft">{kindOf(exhibit)}</p>
         <h3 className="mt-1 break-all font-mono text-[0.8125rem] font-semibold">
           {exhibit.label ?? <Unavailable />}
         </h3>

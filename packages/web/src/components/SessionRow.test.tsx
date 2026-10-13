@@ -157,12 +157,7 @@ test("token stack shows cached only when non-trivial", () => {
 })
 
 test("size pill buckets Small/Medium/Large/Very large + Long past 2h", () => {
-  for (const [total, bucket] of [
-    [50_000, "Small"],
-    [500_000, "Medium"],
-    [5_000_000, "Large"],
-    [12_400_000, "Very large"],
-  ] as const) {
+  for (const total of [50_000, 500_000, 5_000_000, 12_400_000]) {
     renderRow({ ...populated, tokensTotal: total })
   }
   const rows = screen.getAllByRole("link")
@@ -176,8 +171,9 @@ test("size pill buckets Small/Medium/Large/Very large + Long past 2h", () => {
 })
 
 test("without a server breakdown the row falls back to the single total line", () => {
-  const { tokensInput, tokensOutput, tokensCached, ...withoutBreakdown } = populated
-  renderRow(withoutBreakdown as SessionSummary)
+  // A row built before the server sent a breakdown still renders its single total.
+  const legacy = { ...populated, tokensInput: undefined, tokensOutput: undefined }
+  renderRow(legacy as SessionSummary)
   const row = screen.getByRole("link")
   expect(row).toHaveTextContent("128.4k tokens")
   expect(row).not.toHaveTextContent("↑")

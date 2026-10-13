@@ -108,7 +108,10 @@ export const SessionRow = ({ session, to, showProject = true }: Props) => {
         <span className="block truncate text-[0.875rem] font-semibold">
           {title ?? <span className="text-faded italic">untitled session</span>}
           {session.hasAiReview ? (
-            <Badge variant="outline" className="ml-1.5 px-1.5 py-px align-middle font-mono text-[0.62rem] uppercase tracking-[0.06em] text-ink-soft">
+            <Badge
+              variant="outline"
+              className="ml-1.5 px-1.5 py-px align-middle font-mono text-[0.62rem] uppercase tracking-[0.06em] text-ink-soft"
+            >
               AI review
             </Badge>
           ) : null}

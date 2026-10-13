@@ -181,7 +181,7 @@ const LearningCard = ({
 const CommonCard = ({ row }: { readonly row: CommonRow }) => (
   <article className="border border-rule bg-panel p-4">
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <p className="text-[0.9375rem] font-semibold leading-snug">{row.title}</p>
+      <p className="text-lead font-semibold leading-snug">{row.title}</p>
       <p className="font-mono text-[0.72rem] text-ink-soft">
         {row.projectCount} projects · {row.totalOccurrences} sessions total
       </p>
@@ -203,9 +203,7 @@ const controlClass =
 const HowThisWorks = () => (
   <section className="border border-rule bg-panel-2 p-4 text-[0.82rem] leading-relaxed text-ink-soft">
     <p>
-      <span className="font-mono text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-        How this page works
-      </span>
+      <span className="font-mono text-label font-semibold text-stamp">How this page works</span>
     </p>
     <p className="mt-1.5">
       Lessons come out of session reviews and wait here as candidates. Nothing accepts a lesson by
@@ -330,9 +328,7 @@ export const Learnings = () => {
     if (state.error.kind === "unauthorized") return <SessionExpired />
     return (
       <section className="border border-err/40 bg-panel p-6" role="alert">
-        <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
-          Retrieval failed
-        </p>
+        <p className="text-label font-semibold text-err">Retrieval failed</p>
         <p className="mt-2 text-ink-soft">{state.error.message}</p>
       </section>
     )
@@ -345,13 +341,11 @@ export const Learnings = () => {
 
   return (
     <div>
-      <h1 className="mb-3 text-[1.375rem] font-semibold leading-tight">Lessons</h1>
+      <h1 className="mb-3 text-case-title font-semibold leading-tight">Lessons</h1>
       <HowThisWorks />
       <div className="mb-4 mt-4 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-            View
-          </span>
+          <span className="text-label font-semibold text-stamp">View</span>
           <select
             className={controlClass}
             value={filters.view}
@@ -364,9 +358,7 @@ export const Learnings = () => {
         {filters.view === "project" ? (
           <>
             <label className="flex flex-col gap-1">
-              <span className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-                Project
-              </span>
+              <span className="text-label font-semibold text-stamp">Project</span>
               <select
                 className={controlClass}
                 value={filters.project ?? ""}
@@ -383,9 +375,7 @@ export const Learnings = () => {
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-                Audience
-              </span>
+              <span className="text-label font-semibold text-stamp">Audience</span>
               <select
                 className={controlClass}
                 value={filters.audience ?? ""}
@@ -404,9 +394,7 @@ export const Learnings = () => {
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-                Status
-              </span>
+              <span className="text-label font-semibold text-stamp">Status</span>
               <select
                 className={controlClass}
                 value={filters.status ?? ""}
@@ -434,10 +422,8 @@ export const Learnings = () => {
       {state.view === "project" ? (
         state.rows.length === 0 ? (
           <section className="border border-dashed border-rule bg-panel p-8 text-center">
-            <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-              No lessons here yet
-            </p>
-            <h2 className="mt-2 text-[0.9375rem] font-semibold">
+            <p className="text-label font-semibold text-stamp">No lessons here yet</p>
+            <h2 className="mt-2 text-lead font-semibold">
               Reviews have not produced lessons for this view
             </h2>
             <p className="mx-auto mt-2 max-w-md text-ink-soft">
@@ -461,10 +447,8 @@ export const Learnings = () => {
         )
       ) : state.rows.length === 0 ? (
         <section className="border border-dashed border-rule bg-panel p-8 text-center">
-          <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-            No shared lessons yet
-          </p>
-          <h2 className="mt-2 text-[0.9375rem] font-semibold">
+          <p className="text-label font-semibold text-stamp">No shared lessons yet</p>
+          <h2 className="mt-2 text-lead font-semibold">
             No lesson appears in two or more of your projects
           </h2>
           <p className="mx-auto mt-2 max-w-md text-ink-soft">

@@ -14,20 +14,14 @@ describe("timelineTone", () => {
   })
 
   test("a failed tool result inside the entry seq range reads failure", () => {
-    const failed = failedSeqsOf(
-      [...messages],
-      [{ messageId: "m-2", status: "failure" }],
-    )
+    const failed = failedSeqsOf([...messages], [{ messageId: "m-2", status: "failure" }])
     expect(timelineTone({ fromSeq: 1, toSeq: 3, durationMs: 5_000 }, failed, 600_000)).toBe(
       "failure",
     )
   })
 
   test("an error status also reads failure, and failures outside the range do not", () => {
-    const failed = failedSeqsOf(
-      [...messages],
-      [{ messageId: "m-3", status: "error" }],
-    )
+    const failed = failedSeqsOf([...messages], [{ messageId: "m-3", status: "error" }])
     expect(timelineTone({ fromSeq: 1, toSeq: 2 }, failed, 600_000)).toBe("good")
     expect(timelineTone({ fromSeq: 2, toSeq: 3 }, failed, 600_000)).toBe("failure")
   })
@@ -40,20 +34,14 @@ describe("timelineTone", () => {
   })
 
   test("failure wins over slow when both apply", () => {
-    const failed = failedSeqsOf(
-      [...messages],
-      [{ messageId: "m-1", status: "failed" }],
-    )
+    const failed = failedSeqsOf([...messages], [{ messageId: "m-1", status: "failed" }])
     expect(timelineTone({ fromSeq: 1, toSeq: 1, durationMs: 500_000 }, failed, 600_000)).toBe(
       "failure",
     )
   })
 
   test("empty range never matches a failure and reads good", () => {
-    const failed = failedSeqsOf(
-      [...messages],
-      [{ messageId: "m-1", status: "failure" }],
-    )
+    const failed = failedSeqsOf([...messages], [{ messageId: "m-1", status: "failure" }])
     expect(timelineTone({ fromSeq: 5, toSeq: 2, durationMs: 1_000 }, failed, 600_000)).toBe("good")
   })
 

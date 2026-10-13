@@ -4,6 +4,8 @@ import { type ApiError, client, request } from "../api/client.js"
 import type { SyncStatusRow } from "../api/types.js"
 import { SessionExpired } from "../auth/SessionExpired.js"
 import { Autocomplete } from "../components/Autocomplete.js"
+import { Button } from "../components/ui/button.js"
+import { Card, CardContent } from "../components/ui/card.js"
 import { LoadingShell } from "../shell/LoadingShell.js"
 import {
   COLUMNS,
@@ -30,12 +32,12 @@ type State =
 const emptyPanelClass = "border border-dashed border-rule bg-panel p-8 text-center"
 
 const EmptyState = () => (
-  <section className={emptyPanelClass}>
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-      No users yet
-    </p>
-    <h2 className="mt-2 text-[0.9375rem] font-semibold">There is nothing to report</h2>
-  </section>
+  <Card className={emptyPanelClass}>
+    <CardContent className="p-8 text-center">
+      <p className="text-label font-semibold text-stamp">No users yet</p>
+      <h2 className="mt-2 text-lead font-semibold">There is nothing to report</h2>
+    </CardContent>
+  </Card>
 )
 
 const NoMatches = ({
@@ -45,32 +47,28 @@ const NoMatches = ({
   readonly state: TableState
   readonly onClear: () => void
 }) => (
-  <section className={emptyPanelClass}>
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-      No rows match
-    </p>
-    <h2 className="mt-2 text-[0.9375rem] font-semibold">
-      Nothing matches {state.user === "" ? null : `user "${state.user}"`}
-      {state.user !== "" && state.project !== "" ? " and " : null}
-      {state.project === "" ? null : `project "${state.project}"`}
-    </h2>
-    <button
-      type="button"
-      onClick={onClear}
-      className="mt-4 inline-flex items-center justify-center rounded-xs border border-ink bg-ink px-4 py-2 text-panel-2 transition-colors hover:bg-ink-2"
-    >
-      Clear filters
-    </button>
-  </section>
+  <Card className={emptyPanelClass}>
+    <CardContent className="p-8 text-center">
+      <p className="text-label font-semibold text-stamp">No rows match</p>
+      <h2 className="mt-2 text-lead font-semibold">
+        Nothing matches {state.user === "" ? null : `user "${state.user}"`}
+        {state.user !== "" && state.project !== "" ? " and " : null}
+        {state.project === "" ? null : `project "${state.project}"`}
+      </h2>
+      <Button type="button" onClick={onClear} className="mt-4">
+        Clear filters
+      </Button>
+    </CardContent>
+  </Card>
 )
 
 const ErrorState = ({ error }: { readonly error: ApiError }) => (
-  <section className="border border-err/40 bg-panel p-6">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
-      Retrieval failed
-    </p>
-    <p className="mt-2 text-ink-soft">{error.message}</p>
-  </section>
+  <Card className="border-err/40 bg-panel">
+    <CardContent className="p-6">
+      <p className="text-label font-semibold text-err">Retrieval failed</p>
+      <p className="mt-2 text-ink-soft">{error.message}</p>
+    </CardContent>
+  </Card>
 )
 
 const UserCell = ({ row }: { readonly row: SyncStatusRow }) => (
@@ -251,7 +249,7 @@ export const SyncStatus = () => {
 
   return (
     <section>
-      <h1 className="text-[1.375rem] font-semibold leading-tight">Sync status</h1>
+      <h1 className="text-case-title font-semibold leading-tight">Sync status</h1>
       <div className="mt-4">
         <FilterBoxes rows={fetchState.rows} state={tableState} onFilter={onFilter} />
       </div>

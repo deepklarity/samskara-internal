@@ -109,7 +109,7 @@ export const AnalyzeDialog = ({
         aria-labelledby="analyze-dialog-title"
         className="relative w-full max-w-md border border-rule bg-panel-2 p-6 text-ink shadow-overlay"
       >
-        <h2 id="analyze-dialog-title" className="text-[1.375rem] font-semibold leading-tight">
+        <h2 id="analyze-dialog-title" className="text-case-title font-semibold leading-tight">
           Analyze with AI
         </h2>
         <p className="mt-2 text-ink-soft">

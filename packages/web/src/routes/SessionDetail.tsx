@@ -85,9 +85,7 @@ const formatDuration = (ms: number): string => {
 
 const Fact = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className="flex flex-col gap-1">
-    <dt className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-faded">
-      {label}
-    </dt>
+    <dt className="text-label font-semibold text-faded">{label}</dt>
     <dd className="font-mono text-[0.875rem] tabular-nums">{value}</dd>
   </div>
 )
@@ -264,7 +262,7 @@ const SessionHead = ({
       <div className="flex items-start gap-2">
         <h1
           title={session.title ?? undefined}
-          className="max-w-[62ch] truncate text-[1.375rem] font-semibold leading-tight max-sm:whitespace-normal"
+          className="max-w-[62ch] truncate text-case-title font-semibold leading-tight max-sm:whitespace-normal"
         >
           {session.title ?? <span className="text-faded italic">untitled session</span>}
         </h1>
@@ -346,10 +344,8 @@ const Masthead = ({ session, tokens }: { session: SessionFacts; tokens: TokenTot
 
 const NotFound = ({ onBack }: { onBack: () => void }) => (
   <section className="border border-stamp/40 bg-panel p-8 text-center">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-stamp">
-      Nothing on file
-    </p>
-    <h2 className="mt-2 text-[0.9375rem] font-semibold">No such session</h2>
+    <p className="text-label font-semibold text-stamp">Nothing on file</p>
+    <h2 className="mt-2 text-lead font-semibold">No such session</h2>
     <p className="mx-auto mt-2 max-w-md text-ink-soft">
       It either does not exist or has not been shared with you.
     </p>
@@ -365,9 +361,7 @@ const NotFound = ({ onBack }: { onBack: () => void }) => (
 
 const ErrorState = ({ error }: { error: ApiError }) => (
   <section className="border border-err/40 bg-panel p-6">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
-      Retrieval failed
-    </p>
+    <p className="text-label font-semibold text-err">Retrieval failed</p>
     <p className="mt-2 text-ink-soft">{error.message}</p>
   </section>
 )
@@ -780,8 +774,7 @@ const STRIP_SEGMENT: Readonly<Record<AiTimelineEntryKind, string>> = {
 const IDLE_GAP_MS = 60 * 60_000
 
 /** True when the span is an unattended gap rather than recorded work. */
-export const isIdleSpan = (entry: AiTimelineEntry): boolean =>
-  (entry.durationMs ?? 0) > IDLE_GAP_MS
+export const isIdleSpan = (entry: AiTimelineEntry): boolean => (entry.durationMs ?? 0) > IDLE_GAP_MS
 
 /** Work-time for one entry: idle gaps charge nothing, never below zero. */
 export const activeSpanMs = (entry: AiTimelineEntry): number =>
@@ -816,16 +809,18 @@ const TimeStrip = ({
     <section className="mt-4">
       <LensHeading>Where the time went</LensHeading>
       <div className="flex h-2.5 w-full overflow-hidden rounded-pill border border-rule bg-panel-2">
-        {timed.filter((entry) => !isIdleSpan(entry)).map((entry) => (
-          <div
-            key={entry.id}
-            className={
-              STRIP_TONE[timelineTone(entry, failedSeqs, totalMs)] ?? STRIP_SEGMENT[entry.kind]
-            }
-            style={{ width: `${(activeSpanMs(entry) / segmentTotal) * 100}%` }}
-            title={`${displayReviewText(entry.title)} · ${formatSeconds(entry.durationMs ?? 0)}`}
-          />
-        ))}
+        {timed
+          .filter((entry) => !isIdleSpan(entry))
+          .map((entry) => (
+            <div
+              key={entry.id}
+              className={
+                STRIP_TONE[timelineTone(entry, failedSeqs, totalMs)] ?? STRIP_SEGMENT[entry.kind]
+              }
+              style={{ width: `${(activeSpanMs(entry) / segmentTotal) * 100}%` }}
+              title={`${displayReviewText(entry.title)} · ${formatSeconds(entry.durationMs ?? 0)}`}
+            />
+          ))}
       </div>
       {share === null ? null : <p className="mt-1.5 text-[0.82rem] text-ink-soft">{share}</p>}
     </section>
@@ -878,7 +873,8 @@ const TimelineEntryRow = ({
 }) => {
   const idle = isIdleSpan(entry)
   const active = activeSpanMs(entry)
-  const pct = idle || activeMs <= 0 || active <= 0 ? null : Math.max(1, Math.round((active / activeMs) * 100))
+  const pct =
+    idle || activeMs <= 0 || active <= 0 ? null : Math.max(1, Math.round((active / activeMs) * 100))
   const share = idle ? "mostly idle" : pct === null ? null : `${pct}% of timeline`
   // startMs is an epoch timestamp, not an offset into the session — rendering it as
   // "starts Ns in" produced values like "starts 1791349327s in". No session-start
@@ -900,7 +896,7 @@ const TimelineEntryRow = ({
         className={`absolute -left-[27px] top-4 size-3 rounded-full border-2 border-panel ${railDotOf(entry.kind, tone)}`}
       />
       <span className="min-w-0">
-        <span className="block text-[0.9375rem] font-semibold leading-snug">
+        <span className="block text-lead font-semibold leading-snug">
           {displayReviewText(entry.title)}
         </span>
         <span className="mt-0.5 block font-mono text-[0.72rem] tabular-nums text-ink-soft">
@@ -1020,7 +1016,7 @@ const LearningRow = ({
             {SEVERITY_LABEL[learning.severity] ?? learning.severity}
           </Chip>
         )}
-        <span className="text-[0.9375rem] font-semibold leading-snug">
+        <span className="text-lead font-semibold leading-snug">
           {displayReviewText(learning.title)}
         </span>
         {learning.cost === undefined ? null : (
@@ -1083,9 +1079,7 @@ const LearningRow = ({
 }
 
 const LensHeading = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="mb-2 text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-faded">
-    {children}
-  </h3>
+  <h3 className="mb-2 text-label font-semibold text-faded">{children}</h3>
 )
 
 type CodeAwareImprovement = NonNullable<AiReviewSignals["improvements"]>["entries"][number]
@@ -1214,7 +1208,7 @@ const ImprovementRow = ({
   <li>
     <details className="group border border-rule bg-panel">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-3 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0 text-[0.9375rem] font-semibold leading-snug">
+        <span className="min-w-0 text-lead font-semibold leading-snug">
           {displayReviewText(item.title)}
         </span>
         <span
@@ -1432,7 +1426,7 @@ const ReviewerSessionModal = ({
         className="relative w-full max-w-2xl border border-rule bg-panel-2 p-6 text-ink shadow-overlay"
       >
         <div className="flex items-baseline justify-between gap-3">
-          <h2 id="reviewer-session-title" className="text-[1.375rem] font-semibold leading-tight">
+          <h2 id="reviewer-session-title" className="text-case-title font-semibold leading-tight">
             Reviewer session
           </h2>
           <button
@@ -1820,7 +1814,7 @@ const StatusWord = ({ status }: { status: string }) => {
 const LessonRow = ({ row }: { row: SessionLearning }) => (
   <li className="border border-rule bg-panel p-3">
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <p className="text-[0.9375rem] font-semibold leading-snug">{row.title}</p>
+      <p className="text-lead font-semibold leading-snug">{row.title}</p>
       <p className="font-mono text-[0.72rem] text-ink-soft">
         <StatusWord status={row.status} />
         {` · seen ${row.occurrenceCount} ${row.occurrenceCount === 1 ? "time" : "times"}`}
@@ -2058,9 +2052,7 @@ const ReviewPanel = ({
        * only renders for static-only sessions, where it is the one lessons surface. */}
       {ai !== null || review.reviews.length === 0 ? null : (
         <section>
-          <h2 className="mb-2 text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-faded">
-            Lessons from this session
-          </h2>
+          <h2 className="mb-2 text-label font-semibold text-faded">Lessons from this session</h2>
           {review.learnings.length === 0 ? (
             <p className="text-ink-soft">No lessons from this session.</p>
           ) : (

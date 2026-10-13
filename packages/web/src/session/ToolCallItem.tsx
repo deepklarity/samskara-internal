@@ -113,9 +113,7 @@ const Payload = ({
 
   return (
     <div className="min-w-0 border-t border-rule px-3 py-2">
-      <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-faded">
-        {label}
-      </p>
+      <p className="text-label font-semibold text-faded">{label}</p>
       {value === null || value === undefined ? (
         <p className="mt-1 text-[0.72rem] italic text-faded">no payload captured</p>
       ) : entries ? (
@@ -186,9 +184,7 @@ export const ToolCallItem = ({
         <span className="min-w-0 flex-1 truncate font-mono text-[0.72rem] text-faded">
           {gistOf(call.toolInput)}
         </span>
-        <span
-          className={`shrink-0 text-[0.656rem] font-semibold uppercase tracking-[0.12em] ${outcomeClass(status)}`}
-        >
+        <span className={`shrink-0 text-label font-semibold ${outcomeClass(status)}`}>
           <span aria-hidden="true">{status === null ? "·" : (OUTCOME_GLYPH[status] ?? "·")}</span>{" "}
           {label}
         </span>

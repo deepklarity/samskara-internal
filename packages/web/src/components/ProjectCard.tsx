@@ -2,12 +2,11 @@ import type { ReactNode } from "react"
 import { Link } from "react-router-dom"
 import type { ProjectSummary } from "../api/types.js"
 import { absoluteTime } from "../time.js"
+import { Card } from "./ui/card.js"
 
 const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="min-w-0">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft">
-      {label}
-    </p>
+    <p className="text-label font-semibold text-ink-soft">{label}</p>
     <p className="truncate font-mono text-[0.78rem] tabular-nums">{children}</p>
   </div>
 )
@@ -22,15 +21,15 @@ export const ProjectCard = ({ project, to }: Props) => {
   const dormant = sessionCount === 0
 
   return (
-    <article className="flex w-full flex-col gap-3 border border-rule bg-panel-2 p-4 text-left shadow-card transition-colors focus-within:border-ink-soft hover:border-ink-soft">
+    <Card className="flex w-full flex-col gap-3 bg-panel-2 p-4 text-left transition-colors focus-within:border-ink-soft hover:border-ink-soft">
       <div className="min-w-0">
-        <h2 className="truncate text-[0.9375rem] font-semibold">
+        <h2 className="truncate text-lead font-semibold">
           <Link to={to} className="hover:underline">
             {name}
           </Link>
         </h2>
         <p className="truncate font-mono text-[0.78rem] text-custody">/{slug}</p>
-        <p className="truncate text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft">
+        <p className="truncate text-label font-semibold text-ink-soft">
           {owner.type === "org" ? (
             <Link
               to={`/orgs/${encodeURIComponent(owner.slug)}`}
@@ -56,7 +55,7 @@ export const ProjectCard = ({ project, to }: Props) => {
       </div>
 
       {dormant ? (
-        <output className="block border-t border-rule-soft pt-2 text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft">
+        <output className="block border-t border-rule-soft pt-2 text-label font-semibold text-ink-soft">
           No sessions captured yet
         </output>
       ) : (
@@ -67,6 +66,6 @@ export const ProjectCard = ({ project, to }: Props) => {
           View {sessionCount} sessions
         </Link>
       )}
-    </article>
+    </Card>
   )
 }

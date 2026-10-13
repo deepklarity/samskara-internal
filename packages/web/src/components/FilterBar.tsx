@@ -208,182 +208,180 @@ export const FilterBar = ({ filters, options, onChange, onClear }: Props) => {
 
   return (
     <Card aria-label="Search and filter sessions" className="bg-panel p-3">
-      <CardContent className="p-0">      <form
-        className="grid grid-cols-1 items-end gap-2 min-[600px]:grid-cols-[minmax(0,1fr)_auto]"
-        onSubmit={(event) => {
-          event.preventDefault()
-          const q = query.trim() || null
-          onChange(
-            changedFilters(filters, {
-              q,
-              sort:
-                q === null && filters.sort === "relevance"
-                  ? "recent"
-                  : filters.sort === "recent" && q !== null
-                    ? "relevance"
-                    : filters.sort,
-            }),
-          )
-        }}
-      >
-        <div className="min-w-0">
-          <label className={labelClass} htmlFor={searchId}>
-            Search session evidence
-          </label>
-          <div className="relative mt-1">
-            <input
-              id={searchId}
-              type="search"
-              className={`${controlClass} mt-0 h-10 pl-9 pr-14`}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Terms, phrases, or OR"
-              aria-describedby={`${searchId}-help`}
-            />
-            <svg
-              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft"
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-4-4" />
-            </svg>
-            {query === "" ? null : (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery("")
-                  onChange(
-                    changedFilters(filters, {
-                      q: null,
-                      sort: filters.sort === "relevance" ? "recent" : filters.sort,
-                    }),
-                  )
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[0.68rem] font-semibold text-custody hover:underline"
-                aria-label="Clear search"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-          <span id={`${searchId}-help`} className="sr-only">
-            Search titles, messages, pull requests, tool calls, and tool results you are authorized
-            to read.
-          </span>
-        </div>
-        <Button type="submit">
-          Search
-        </Button>
-      </form>
-
-      <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-rule pt-3">
-        <span className={labelClass}>Narrow the case file</span>
-        <button
-          type="button"
-          onClick={onClear}
-          className="text-[0.68rem] font-semibold text-custody hover:underline"
-        >
-          Reset search &amp; filters
-        </button>
-      </div>
-
-      <div className="mt-2 grid grid-cols-1 gap-3 min-[560px]:grid-cols-2 min-[1000px]:grid-cols-4">
-        <Picker
-          label="Project"
-          value={filters.project ?? ""}
-          options={options.projects}
-          placeholder="All projects"
-          onChange={(project) => onChange(changedFilters(filters, { project: project || null }))}
-        />
-        <Picker
-          label="User"
-          value={filters.user ?? ""}
-          options={options.authors}
-          placeholder="All users"
-          onChange={(user) => onChange(changedFilters(filters, { user: user || null }))}
-        />
-        <Picker
-          label="Repository"
-          value={filters.repo ?? ""}
-          options={options.repositories}
-          placeholder="All repositories"
-          onChange={(repo) => onChange(changedFilters(filters, { repo: repo || null }))}
-        />
-        <Picker
-          label="Branch"
-          value={filters.branch ?? ""}
-          options={options.branches.map((branch) => ({ value: branch, label: branch }))}
-          placeholder="All branches"
-          onChange={(branch) => onChange(changedFilters(filters, { branch: branch || null }))}
-        />
-        <TextFilter
-          label="PR number"
-          value={filters.pr}
-          placeholder="e.g. 42"
-          hint="Enter a canonical positive pull request number."
-          onSubmit={(pr) => onChange(changedFilters(filters, { pr }))}
-        />
-        <TextFilter
-          label="Commit SHA"
-          value={filters.commit}
-          placeholder="7–40 hex characters"
-          hint="Use a full SHA or an unambiguous seven to forty character hexadecimal prefix."
-          onSubmit={(commit) =>
-            onChange(changedFilters(filters, { commit: commit?.trim().toLowerCase() ?? null }))
-          }
-        />
-        <RangeControl filters={filters} onChange={onChange} />
-        <CountFilter
-          label="Min tokens"
-          value={filters.minTokens}
-          placeholder="e.g. 1000"
-          onSubmit={(minTokens) => onChange(changedFilters(filters, { minTokens }))}
-        />
-        <CountFilter
-          label="Max tokens"
-          value={filters.maxTokens}
-          placeholder="e.g. 50000"
-          onSubmit={(maxTokens) => onChange(changedFilters(filters, { maxTokens }))}
-        />
-        <CountFilter
-          label="Min minutes"
-          value={filters.minMinutes}
-          placeholder="e.g. 5"
-          onSubmit={(minMinutes) => onChange(changedFilters(filters, { minMinutes }))}
-        />
-        <CountFilter
-          label="Max minutes"
-          value={filters.maxMinutes}
-          placeholder="e.g. 120"
-          onSubmit={(maxMinutes) => onChange(changedFilters(filters, { maxMinutes }))}
-        />
-        <Choice
-          label="AI analysis"
-          value={filters.aiReview ?? ""}
-          options={[
-            { value: "", label: "Any" },
-            { value: "done", label: "Analyzed" },
-            { value: "missing", label: "Not analyzed" },
-          ]}
-          onChange={(aiReview) =>
+      <CardContent className="p-0">
+        {" "}
+        <form
+          className="grid grid-cols-1 items-end gap-2 min-[600px]:grid-cols-[minmax(0,1fr)_auto]"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const q = query.trim() || null
             onChange(
               changedFilters(filters, {
-                aiReview: aiReview === "" ? null : (aiReview as AiReviewState),
+                q,
+                sort:
+                  q === null && filters.sort === "relevance"
+                    ? "recent"
+                    : filters.sort === "recent" && q !== null
+                      ? "relevance"
+                      : filters.sort,
               }),
             )
-          }
-        />
-        <Choice
-          label="Sort by"
-          value={filters.sort}
-          options={sorts.map((sort) => ({ value: sort, label: SORT_LABEL[sort] }))}
-          onChange={(sort) => onChange(changedFilters(filters, { sort: asSort(sort) }))}
-        />
-      </div>
+          }}
+        >
+          <div className="min-w-0">
+            <label className={labelClass} htmlFor={searchId}>
+              Search session evidence
+            </label>
+            <div className="relative mt-1">
+              <input
+                id={searchId}
+                type="search"
+                className={`${controlClass} mt-0 h-10 pl-9 pr-14`}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Terms, phrases, or OR"
+                aria-describedby={`${searchId}-help`}
+              />
+              <svg
+                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-4-4" />
+              </svg>
+              {query === "" ? null : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("")
+                    onChange(
+                      changedFilters(filters, {
+                        q: null,
+                        sort: filters.sort === "relevance" ? "recent" : filters.sort,
+                      }),
+                    )
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[0.68rem] font-semibold text-custody hover:underline"
+                  aria-label="Clear search"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <span id={`${searchId}-help`} className="sr-only">
+              Search titles, messages, pull requests, tool calls, and tool results you are
+              authorized to read.
+            </span>
+          </div>
+          <Button type="submit">Search</Button>
+        </form>
+        <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-rule pt-3">
+          <span className={labelClass}>Narrow the case file</span>
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-[0.68rem] font-semibold text-custody hover:underline"
+          >
+            Reset search &amp; filters
+          </button>
+        </div>
+        <div className="mt-2 grid grid-cols-1 gap-3 min-[560px]:grid-cols-2 min-[1000px]:grid-cols-4">
+          <Picker
+            label="Project"
+            value={filters.project ?? ""}
+            options={options.projects}
+            placeholder="All projects"
+            onChange={(project) => onChange(changedFilters(filters, { project: project || null }))}
+          />
+          <Picker
+            label="User"
+            value={filters.user ?? ""}
+            options={options.authors}
+            placeholder="All users"
+            onChange={(user) => onChange(changedFilters(filters, { user: user || null }))}
+          />
+          <Picker
+            label="Repository"
+            value={filters.repo ?? ""}
+            options={options.repositories}
+            placeholder="All repositories"
+            onChange={(repo) => onChange(changedFilters(filters, { repo: repo || null }))}
+          />
+          <Picker
+            label="Branch"
+            value={filters.branch ?? ""}
+            options={options.branches.map((branch) => ({ value: branch, label: branch }))}
+            placeholder="All branches"
+            onChange={(branch) => onChange(changedFilters(filters, { branch: branch || null }))}
+          />
+          <TextFilter
+            label="PR number"
+            value={filters.pr}
+            placeholder="e.g. 42"
+            hint="Enter a canonical positive pull request number."
+            onSubmit={(pr) => onChange(changedFilters(filters, { pr }))}
+          />
+          <TextFilter
+            label="Commit SHA"
+            value={filters.commit}
+            placeholder="7–40 hex characters"
+            hint="Use a full SHA or an unambiguous seven to forty character hexadecimal prefix."
+            onSubmit={(commit) =>
+              onChange(changedFilters(filters, { commit: commit?.trim().toLowerCase() ?? null }))
+            }
+          />
+          <RangeControl filters={filters} onChange={onChange} />
+          <CountFilter
+            label="Min tokens"
+            value={filters.minTokens}
+            placeholder="e.g. 1000"
+            onSubmit={(minTokens) => onChange(changedFilters(filters, { minTokens }))}
+          />
+          <CountFilter
+            label="Max tokens"
+            value={filters.maxTokens}
+            placeholder="e.g. 50000"
+            onSubmit={(maxTokens) => onChange(changedFilters(filters, { maxTokens }))}
+          />
+          <CountFilter
+            label="Min minutes"
+            value={filters.minMinutes}
+            placeholder="e.g. 5"
+            onSubmit={(minMinutes) => onChange(changedFilters(filters, { minMinutes }))}
+          />
+          <CountFilter
+            label="Max minutes"
+            value={filters.maxMinutes}
+            placeholder="e.g. 120"
+            onSubmit={(maxMinutes) => onChange(changedFilters(filters, { maxMinutes }))}
+          />
+          <Choice
+            label="AI analysis"
+            value={filters.aiReview ?? ""}
+            options={[
+              { value: "", label: "Any" },
+              { value: "done", label: "Analyzed" },
+              { value: "missing", label: "Not analyzed" },
+            ]}
+            onChange={(aiReview) =>
+              onChange(
+                changedFilters(filters, {
+                  aiReview: aiReview === "" ? null : (aiReview as AiReviewState),
+                }),
+              )
+            }
+          />
+          <Choice
+            label="Sort by"
+            value={filters.sort}
+            options={sorts.map((sort) => ({ value: sort, label: SORT_LABEL[sort] }))}
+            onChange={(sort) => onChange(changedFilters(filters, { sort: asSort(sort) }))}
+          />
+        </div>
       </CardContent>
     </Card>
   )

@@ -4,6 +4,8 @@ import { type ApiError, client, request } from "../api/client.js"
 import type { OrgSummary } from "../api/types.js"
 import { useAuth } from "../auth/AuthProvider.js"
 import { SessionExpired } from "../auth/SessionExpired.js"
+import { Button } from "../components/ui/button.js"
+import { Card, CardContent } from "../components/ui/card.js"
 import { LoadingShell } from "../shell/LoadingShell.js"
 
 type State =
@@ -19,12 +21,12 @@ type FormState =
 const IDLE_FORM: FormState = { phase: "idle" }
 
 const ErrorState = ({ error }: { error: ApiError }) => (
-  <section className="border border-err/40 bg-panel p-6">
-    <p className="text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-err">
-      Retrieval failed
-    </p>
-    <p className="mt-2 text-ink-soft">{error.message}</p>
-  </section>
+  <Card className="border-err/40 bg-panel">
+    <CardContent className="p-6">
+      <p className="text-label font-semibold text-err">Retrieval failed</p>
+      <p className="mt-2 text-ink-soft">{error.message}</p>
+    </CardContent>
+  </Card>
 )
 
 export const Orgs = () => {
@@ -89,15 +91,15 @@ export const Orgs = () => {
 
   return (
     <section>
-      <h1 className="text-[1.375rem] font-semibold leading-tight">Orgs</h1>
+      <h1 className="text-case-title font-semibold leading-tight">Orgs</h1>
       <ul className="mt-4 grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 min-[840px]:grid-cols-3">
         {state.orgs.map((org) => (
           <li key={org.id}>
             <Link
               to={`/orgs/${encodeURIComponent(org.githubSlug)}`}
-              className="flex w-full flex-col gap-2 border border-rule bg-panel-2 p-4 text-left shadow-card transition-colors hover:border-ink-soft"
+              className="flex w-full flex-col gap-2 bg-panel-2 p-4 text-left transition-colors hover:border-ink-soft"
             >
-              <h2 className="truncate text-[0.9375rem] font-semibold">{org.name}</h2>
+              <h2 className="truncate text-lead font-semibold">{org.name}</h2>
               <p className="truncate font-mono text-[0.78rem] text-custody">{org.githubSlug}</p>
             </Link>
           </li>
@@ -105,11 +107,11 @@ export const Orgs = () => {
       </ul>
 
       {user?.isSuperAdmin ? (
-        <form onSubmit={register} className="mt-6 max-w-sm border border-rule bg-panel-2 p-4">
-          <h2 className="text-[0.9375rem] font-semibold">Register an org</h2>
+        <form onSubmit={register} className="mt-6 max-w-sm bg-panel-2 p-4">
+          <h2 className="text-lead font-semibold">Register an org</h2>
           <label
             htmlFor="org-slug-input"
-            className="mt-3 block text-[0.656rem] font-semibold uppercase tracking-[0.12em] text-ink-soft"
+            className="mt-3 block text-label font-semibold text-ink-soft"
           >
             GitHub org slug
           </label>
@@ -131,13 +133,13 @@ export const Orgs = () => {
             />
             Add new GitHub members automatically
           </label>
-          <button
+          <Button
             type="submit"
             disabled={form.phase === "submitting" || slug.trim() === ""}
-            className="mt-4 border border-rule bg-panel px-3 py-2 text-[0.78rem] font-semibold disabled:opacity-60"
+            className="mt-4"
           >
             {form.phase === "submitting" ? "Registering…" : "Register"}
-          </button>
+          </Button>
           {form.phase === "failed" ? (
             <p role="alert" className="mt-3 border border-err/40 bg-panel p-3 text-err">
               {form.error}

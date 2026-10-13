@@ -77,7 +77,7 @@ export const DeleteProjectDialog = ({ open, project, onClose, restoreFocusTo }: 
       >
         <h2
           id="delete-project-dialog-title"
-          className="text-[1.375rem] font-semibold leading-tight"
+          className="text-case-title font-semibold leading-tight"
         >
           Delete project
         </h2>
