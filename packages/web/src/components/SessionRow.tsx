@@ -116,25 +116,25 @@ export const SessionRow = ({ session, to, showProject = true }: Props) => {
             </Badge>
           ) : null}
         </span>
-        <span className="block truncate font-mono text-[0.72rem] text-ink-soft">
+        <span className="block truncate text-evidence text-ink-soft">
           {userLogin} · {repo === null ? null : `${repoLabel(repo)} · `}
           {durationMs === null ? <Unavailable /> : formatDuration(durationMs)} ·{" "}
+          {/*
+            One pill, never two: size and length describe the same row, and two badges
+            for it read as two claims. Long sessions lead the label, because that is the
+            fact a reader scans for; size follows in its tooltip.
+          */}
           <Badge
             variant="outline"
-            title={`size ${bucket} · ${formatTokens(tokensTotal)} total`}
-            className="bg-panel px-1 py-px font-sans not-italic"
+            title={
+              isLongSession(durationMs)
+                ? `long session · size ${bucket} · ${formatTokens(tokensTotal)} total`
+                : `size ${bucket} · ${formatTokens(tokensTotal)} total`
+            }
+            className="bg-panel font-sans not-italic"
           >
-            {bucket}
+            {isLongSession(durationMs) ? `Long · ${bucket}` : bucket}
           </Badge>
-          {isLongSession(durationMs) ? (
-            <Badge
-              variant="outline"
-              title={`long session · ${formatDuration(durationMs as number)}`}
-              className="ml-1 bg-panel px-1 py-px font-sans not-italic"
-            >
-              Long
-            </Badge>
-          ) : null}
         </span>
         <span className="mt-0.5 flex flex-col font-mono text-[0.68rem] leading-4 text-faded">
           {hasBreakdown ? (

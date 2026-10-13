@@ -78,11 +78,16 @@
   --color-muted: #f4f6f8;
   --color-muted-foreground: #5b616b;
   --color-border: #b0b9c6;
+  --color-input: #d2d8e0;
+  --color-ring: #2b4a78;
   --color-destructive: #9e2a2b;
   --color-destructive-foreground: #ffffff;
-  --radius-lg: 3px;
-  --radius-md: 3px;
-  --radius-sm: 2px;
+  /* Modern, not squared-off: 2-3px corners read as dated at every scale. */
+  --radius-xl: 14px;
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+  --radius-xs: 4px;
 }
 
 @keyframes file-in {

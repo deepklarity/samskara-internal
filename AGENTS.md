@@ -19,3 +19,22 @@ read [`.claude/skills/herdr/SKILL.md`](.claude/skills/herdr/SKILL.md) first and 
 It teaches the `herdr` CLI: inspecting panes, starting agents, prompting them, reading
 output, and waiting for completion. This applies to every harness (Claude Code, Codex,
 OpenCode, and others).
+
+### Choosing an agent's model — pass a flag, never ask the agent to switch
+
+A model is set when the agent starts, by passing the harness's own flag after `--`:
+
+```bash
+herdr agent start audit --kind opencode --pane "$PANE" -- --model opencode/nemotron-3.5-lightning-free
+```
+
+- **Do not tell an agent to run `/model`.** That is a UI action in the TUI; the agent
+  cannot perform it and will stall on the picker. Same for any other TUI-only command.
+- `opencode` accepts `-m, --model provider/model`; `codex`/`claude` take their own flags.
+  Check `opencode --help` (or `herdr agent --help`) before guessing a flag name.
+- **Free-plan working models here:** `opencode/nemotron-3.5-lightning-free`,
+  `opencode/muse-spark-1.3-contributor-free`. `glm-5.3-flash` /
+  `zai-coding-plan/glm-5.3-flash` return a server-side `UnknownError` on every request —
+  do not build a flow around them.
+- Verify what the agent actually got with `herdr agent read <name> --source visible`
+  (the status line names the model), not by asking it.

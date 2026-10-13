@@ -156,7 +156,7 @@ test("token stack shows cached only when non-trivial", () => {
   expect(screen.getAllByRole("link")[1]).not.toHaveTextContent("cached")
 })
 
-test("size pill buckets Small/Medium/Large/Very large + Long past 2h", () => {
+test("size pill buckets Small/Medium/Large/Very large, and one Long pill past 2h", () => {
   for (const total of [50_000, 500_000, 5_000_000, 12_400_000]) {
     renderRow({ ...populated, tokensTotal: total })
   }
@@ -167,7 +167,7 @@ test("size pill buckets Small/Medium/Large/Very large + Long past 2h", () => {
   expect(rows[3]).toHaveTextContent("Very large")
   expect(rows[0]).not.toHaveTextContent("Long")
   renderRow({ ...populated, tokensTotal: 50_000, durationMs: 3 * 60 * 60_000 })
-  expect(screen.getAllByRole("link")[4]).toHaveTextContent("Long")
+  expect(screen.getAllByRole("link")[4]).toHaveTextContent("Long · Small")
 })
 
 test("without a server breakdown the row falls back to the single total line", () => {
