@@ -343,27 +343,25 @@ const Masthead = ({ session, tokens }: { session: SessionFacts; tokens: TokenTot
 )
 
 const NotFound = ({ onBack }: { onBack: () => void }) => (
-  <section className="border border-stamp/40 bg-panel p-8 text-center">
+  <Card className="border-stamp/40 bg-panel"><CardContent className="p-8 text-center">
     <p className="text-label font-semibold text-stamp">Nothing on file</p>
     <h2 className="mt-2 text-lead font-semibold">No such session</h2>
     <p className="mx-auto mt-2 max-w-md text-ink-soft">
       It either does not exist or has not been shared with you.
     </p>
-    <button
-      type="button"
-      onClick={onBack}
-      className="mt-4 inline-flex items-center justify-center rounded-xs border border-ink bg-ink px-4 py-2 text-panel-2 transition-colors hover:bg-ink-2"
-    >
+    <Button type="button" onClick={onBack} className="mt-4">
       Back to all sessions
-    </button>
-  </section>
+    </Button>
+    </CardContent>
+  </Card>
 )
 
 const ErrorState = ({ error }: { error: ApiError }) => (
-  <section className="border border-err/40 bg-panel p-6">
+  <Card className="border-err/40 bg-panel"><CardContent className="p-6">
     <p className="text-label font-semibold text-err">Retrieval failed</p>
     <p className="mt-2 text-ink-soft">{error.message}</p>
-  </section>
+    </CardContent>
+  </Card>
 )
 
 type CapturedState =
@@ -1020,7 +1018,7 @@ const LearningRow = ({
           {displayReviewText(learning.title)}
         </span>
         {learning.cost === undefined ? null : (
-          <span className="font-mono text-[0.72rem] text-ink-soft">{learning.cost}</span>
+          <span className="text-evidence text-ink-soft">{learning.cost}</span>
         )}
       </div>
       <p className="mt-1.5 text-[0.82rem] text-ink-soft">{displayReviewText(learning.detail)}</p>
@@ -1546,7 +1544,7 @@ const AiReviewCard = ({
         <Badge variant="outline" className="font-mono">
           {review.analyzer === "ai-v2" ? "Code-aware AI review" : "AI review"}
         </Badge>
-        <span className="font-mono text-[0.72rem] text-faded">
+        <span className="text-evidence text-faded">
           Analyzed {absoluteTime(review.analyzedAt ?? review.createdAt)}
         </span>
         <Button
@@ -1658,7 +1656,7 @@ const AiReviewCard = ({
           <section className="mt-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-[1rem] font-semibold">Improvements for future sessions</h3>
-              <span className="font-mono text-[0.72rem] text-ink-soft">
+              <span className="text-evidence text-ink-soft">
                 {improvements.length} {improvements.length === 1 ? "finding" : "findings"}
               </span>
             </div>
@@ -1763,7 +1761,7 @@ const AnalyzeSection = ({
           Analyze with AI
         </Button>
         {analysis.phase === "running" ? (
-          <span className="font-mono text-[0.72rem] text-ink-soft">
+          <span className="text-evidence text-ink-soft">
             Analyzing… (started {absoluteTime(analysis.startedAt)})
           </span>
         ) : null}
@@ -1815,7 +1813,7 @@ const LessonRow = ({ row }: { row: SessionLearning }) => (
   <li className="border border-rule bg-panel p-3">
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
       <p className="text-lead font-semibold leading-snug">{row.title}</p>
-      <p className="font-mono text-[0.72rem] text-ink-soft">
+      <p className="text-evidence text-ink-soft">
         <StatusWord status={row.status} />
         {` · seen ${row.occurrenceCount} ${row.occurrenceCount === 1 ? "time" : "times"}`}
       </p>
