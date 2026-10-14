@@ -142,6 +142,13 @@ kicking one off.
 - **Methodical debugging.** Observe before acting; read the actual error. State the
   hypothesis ("X because Y; changing Z should fix it because W"), change one thing at a
   time, and if a fix fails twice the diagnosis is wrong: zoom out. Breadcrumb first.
+## TDD: test first for behavior changes; tests survive refactors — test behavior,
+  not implementation shape.
+- **AI analysis is compounding input.** The session analyzer (`samskara review --ai`,
+  ai-v2) is not a verdict machine — its learnings are meant to land somewhere: a
+  severity-3+ learning names the doc it would update (CLAUDE.md, `docs/patterns/`,
+  breadcrumbs, a skill, code) and the proposed change. Read the analysis with that in
+  mind; apply accepted learnings instead of letting them pile up as candidates.
 - **TDD**: test first for behavior changes; tests survive refactors — test behavior,
   not implementation shape.
 

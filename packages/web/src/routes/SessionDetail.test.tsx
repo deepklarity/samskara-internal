@@ -1984,10 +1984,10 @@ test("AI-9c: where the time went — a proportional strip with titled segments a
   // Turning points carry the accent color; ordinary phases stay neutral.
   expect(
     within(panel).getByTitle("Pivot: mine opencode.db instead · active 71s of 71s").className,
-  ).toContain("bg-stamp")
+  ).toContain("bg-amber-600")
   expect(
     within(panel).getByTitle("Recovering the missing export · active 95s of 95s").className,
-  ).not.toContain("bg-stamp")
+  ).not.toContain("bg-amber-600")
   expect(
     within(panel).getByText(/95s of 184s — 52% — went to Recovering the missing export/),
   ).toBeInTheDocument()

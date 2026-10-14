@@ -91,10 +91,10 @@ const evidenceLine = (row: LearningRow): string =>
     ? "No evidence recorded"
     : `${row.evidence.length} evidence ${row.evidence.length === 1 ? "pointer" : "pointers"} in the review`
 
-const STATUS_VARIANT: Readonly<Record<LearningStatus, "success" | "secondary" | "destructive">> = {
-  accepted: "success",
+const STATUS_VARIANT: Readonly<Record<LearningStatus, "default" | "secondary" | "destructive">> = {
+  accepted: "default",
   candidate: "secondary",
-  superseded: "secondary",
+  superseded: "destructive",
 }
 
 const StatusWord = ({ status }: { readonly status: LearningStatus }) => (
@@ -117,14 +117,14 @@ const LearningCard = ({
   <Card>
     <CardContent className="p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
-        <p className="text-lead font-semibold leading-snug">{row.title}</p>
-        <div className="flex items-center gap-1.5 text-evidence text-ink-soft">
+        <p className="text-foreground font-semibold leading-snug">{row.title}</p>
+        <div className="flex items-center gap-1.5 text-muted-foreground">
           <StatusWord status={row.status} />
           <span>{`seen in ${row.occurrenceCount} ${row.occurrenceCount === 1 ? "session" : "sessions"}`}</span>
         </div>
       </div>
-      <p className="mt-2 text-body leading-relaxed text-ink-soft">{row.detail}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-evidence text-faded">
+      <p className="mt-2 text-muted-foreground leading-relaxed">{row.detail}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
         <span>{AUDIENCE_LABEL[row.audience]}</span>
         <span aria-hidden="true">·</span>
         <span>{row.category}</span>
@@ -179,18 +179,18 @@ const LearningCard = ({
 )
 
 const CommonCard = ({ row }: { readonly row: CommonRow }) => (
-  <article className="border border-rule bg-panel p-4">
+  <article className="bg-card p-4">
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <p className="text-lead font-semibold leading-snug">{row.title}</p>
-      <p className="font-mono text-[0.72rem] text-ink-soft">
+      <p className="text-foreground font-semibold leading-snug">{row.title}</p>
+      <p className="font-mono text-[0.72rem] text-muted-foreground">
         {row.projectCount} projects · {row.totalOccurrences} sessions total
       </p>
     </div>
-    <p className="mt-1.5 text-ink-soft">{row.detail}</p>
-    <p className="mt-2 font-mono text-[0.72rem] text-ink-soft">
+    <p className="mt-1.5 text-muted-foreground">{row.detail}</p>
+    <p className="mt-2 font-mono text-[0.72rem] text-muted-foreground">
       {AUDIENCE_LABEL[row.audience]} · {row.category} · {row.projectNames.join(" · ")}
     </p>
-    <p className="mt-2 text-[0.82rem] text-ink-soft">
+    <p className="mt-2 text-muted-foreground">
       The same lesson in several projects is usually about the tools, not the project. Accept or
       retire it in each project's own view.
     </p>
@@ -198,27 +198,27 @@ const CommonCard = ({ row }: { readonly row: CommonRow }) => (
 )
 
 const controlClass =
-  "h-9 rounded-xs border border-rule bg-panel px-2.5 font-mono text-[0.78rem] text-ink transition-colors focus:border-ink focus:outline-none"
+  "h-9 rounded-sm border bg-input px-2.5 font-mono text-[0.78rem] text-foreground transition-colors focus:ring-2 focus:ring-ring/50"
 
 const HowThisWorks = () => (
-  <section className="border border-rule bg-panel-2 p-4 text-[0.82rem] leading-relaxed text-ink-soft">
+  <section className="border bg-card p-4 text-[0.82rem] leading-relaxed text-muted-foreground">
     <p>
-      <span className="font-mono text-label font-semibold text-stamp">How this page works</span>
+      <span className="font-mono text-foreground font-semibold">How this page works</span>
     </p>
     <p className="mt-1.5">
       Lessons come out of session reviews and wait here as candidates. Nothing accepts a lesson by
       itself — only a person reading this page does.{" "}
-      <strong className="font-semibold text-ink">Accept</strong> marks a lesson as real,{" "}
-      <strong className="font-semibold text-ink">Reject</strong> retires one you disagree with,{" "}
-      <strong className="font-semibold text-ink">Retire</strong> takes an accepted lesson out of
-      circulation, and a retired lesson can be brought back to candidate.
+      <strong className="font-semibold text-foreground">Accept</strong> marks a lesson as real,{" "}
+      <strong className="font-semibold text-foreground">Reject</strong> retires one you disagree
+      with, <strong className="font-semibold text-foreground">Retire</strong> takes an accepted
+      lesson out of circulation, and a retired lesson can be brought back to candidate.
     </p>
     <p className="mt-1.5">
       Where accepted lessons go: nowhere until someone exports them. Running{" "}
-      <code className="font-mono text-[0.78rem] text-custody">samskara learn --write</code> in a
-      project checkout writes the accepted lessons of that project into the repo as files under{" "}
-      <code className="font-mono text-[0.78rem] text-custody">.harness/knowledge/</code> for the
-      next session to read. Rejecting or retiring keeps them out of that export.
+      <code className="font-mono text-[0.78rem] text-muted-foreground">samskara learn --write</code>{" "}
+      in a project checkout writes the accepted lessons of that project into the repo as files under
+      <code className="font-mono text-[0.78rem] text-muted-foreground">.harness/knowledge/</code>{" "}
+      for the next session to read. Rejecting or retiring keeps them out of that export.
     </p>
   </section>
 )
@@ -327,9 +327,9 @@ export const Learnings = () => {
   if (state.phase === "failed") {
     if (state.error.kind === "unauthorized") return <SessionExpired />
     return (
-      <section className="border border-err/40 bg-panel p-6" role="alert">
-        <p className="text-label font-semibold text-err">Retrieval failed</p>
-        <p className="mt-2 text-ink-soft">{state.error.message}</p>
+      <section className="bg-card border p-6" role="alert">
+        <p className="text-destructive font-semibold">Retrieval failed</p>
+        <p className="mt-2 text-muted-foreground">{state.error.message}</p>
       </section>
     )
   }
@@ -345,7 +345,7 @@ export const Learnings = () => {
       <HowThisWorks />
       <div className="mb-4 mt-4 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-label font-semibold text-stamp">View</span>
+          <span className="text-label font-semibold">View</span>
           <select
             className={controlClass}
             value={filters.view}
@@ -358,7 +358,7 @@ export const Learnings = () => {
         {filters.view === "project" ? (
           <>
             <label className="flex flex-col gap-1">
-              <span className="text-label font-semibold text-stamp">Project</span>
+              <span className="text-label font-semibold">Project</span>
               <select
                 className={controlClass}
                 value={filters.project ?? ""}
@@ -375,7 +375,7 @@ export const Learnings = () => {
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-label font-semibold text-stamp">Audience</span>
+              <span className="text-label font-semibold">Audience</span>
               <select
                 className={controlClass}
                 value={filters.audience ?? ""}
@@ -394,7 +394,7 @@ export const Learnings = () => {
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-label font-semibold text-stamp">Status</span>
+              <span className="text-label font-semibold">Status</span>
               <select
                 className={controlClass}
                 value={filters.status ?? ""}
@@ -421,15 +421,17 @@ export const Learnings = () => {
 
       {state.view === "project" ? (
         state.rows.length === 0 ? (
-          <section className="border border-dashed border-rule bg-panel p-8 text-center">
-            <p className="text-label font-semibold text-stamp">No lessons here yet</p>
-            <h2 className="mt-2 text-lead font-semibold">
+          <section className="bg-card p-8 text-center">
+            <p className="text-foreground font-semibold">No lessons here yet</p>
+            <h2 className="mt-2 text-foreground font-semibold">
               Reviews have not produced lessons for this view
             </h2>
-            <p className="mx-auto mt-2 max-w-md text-ink-soft">
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
               Lessons appear after sessions are reviewed — run{" "}
-              <code className="font-mono text-[0.78rem] text-custody">samskara review</code> or
-              widen the filters above.
+              <code className="font-mono text-[0.78rem] text-muted-foreground">
+                samskara review
+              </code>{" "}
+              or widen the filters above.
             </p>
           </section>
         ) : (
@@ -446,12 +448,12 @@ export const Learnings = () => {
           </div>
         )
       ) : state.rows.length === 0 ? (
-        <section className="border border-dashed border-rule bg-panel p-8 text-center">
-          <p className="text-label font-semibold text-stamp">No shared lessons yet</p>
-          <h2 className="mt-2 text-lead font-semibold">
+        <section className="bg-card p-8 text-center">
+          <p className="text-foreground font-semibold">No shared lessons yet</p>
+          <h2 className="mt-2 text-foreground font-semibold">
             No lesson appears in two or more of your projects
           </h2>
-          <p className="mx-auto mt-2 max-w-md text-ink-soft">
+          <p className="mx-auto mt-2 max-w-md text-muted-foreground">
             When the same lesson shows up in several projects, it is listed here as a pattern rather
             than as separate rows.
           </p>

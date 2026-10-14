@@ -29,13 +29,13 @@ type State =
   | ({ readonly phase: "ready" } & Loaded)
   | { readonly phase: "failed"; readonly error: ApiError }
 
-const emptyPanelClass = "border border-dashed border-rule bg-panel p-8 text-center"
+const emptyPanelClass = "bg-card p-8 text-center"
 
 const EmptyState = () => (
   <Card className={emptyPanelClass}>
     <CardContent className="p-8 text-center">
-      <p className="text-label font-semibold text-stamp">No users yet</p>
-      <h2 className="mt-2 text-lead font-semibold">There is nothing to report</h2>
+      <p className="text-destructive font-semibold text-foreground">No users yet</p>
+      <h2 className="mt-2 text-foreground font-semibold">There is nothing to report</h2>
     </CardContent>
   </Card>
 )
@@ -49,8 +49,8 @@ const NoMatches = ({
 }) => (
   <Card className={emptyPanelClass}>
     <CardContent className="p-8 text-center">
-      <p className="text-label font-semibold text-stamp">No rows match</p>
-      <h2 className="mt-2 text-lead font-semibold">
+      <p className="text-destructive font-semibold text-foreground">No rows match</p>
+      <h2 className="mt-2 text-foreground font-semibold">
         Nothing matches {state.user === "" ? null : `user "${state.user}"`}
         {state.user !== "" && state.project !== "" ? " and " : null}
         {state.project === "" ? null : `project "${state.project}"`}
@@ -63,16 +63,16 @@ const NoMatches = ({
 )
 
 const ErrorState = ({ error }: { readonly error: ApiError }) => (
-  <Card className="border-err/40 bg-panel">
+  <Card className="bg-card border">
     <CardContent className="p-6">
-      <p className="text-label font-semibold text-err">Retrieval failed</p>
-      <p className="mt-2 text-ink-soft">{error.message}</p>
+      <p className="text-destructive font-semibold text-err">Retrieval failed</p>
+      <p className="mt-2 text-muted-foreground">{error.message}</p>
     </CardContent>
   </Card>
 )
 
 const UserCell = ({ row }: { readonly row: SyncStatusRow }) => (
-  <td className="border border-rule px-2 py-1 align-top">
+  <td className="border p-2 align-top">
     {row.avatarUrl === null ? null : (
       <img
         src={row.avatarUrl}
@@ -82,27 +82,29 @@ const UserCell = ({ row }: { readonly row: SyncStatusRow }) => (
     )}
     <span className="font-semibold">{row.githubLogin}</span>
     {row.name === null ? null : (
-      <span className="block text-[0.72rem] text-ink-soft">{row.name}</span>
+      <span className="block text-[0.72rem] text-muted-foreground">{row.name}</span>
     )}
   </td>
 )
 
 const ProjectCell = ({ row }: { readonly row: SyncStatusRow }) => {
   if (row.projectId === null) {
-    return <td className="border border-rule px-2 py-1 align-top text-faded italic">no projects</td>
+    return <td className="border p-2 align-top text-muted-foreground italic">no projects</td>
   }
   return (
-    <td className="border border-rule px-2 py-1 align-top">
+    <td className="border p-2 align-top">
       <span>{row.projectName}</span>
-      <span className="block font-mono text-[0.72rem] text-ink-soft">{row.projectSlug}</span>
+      <span className="block font-mono text-[0.72rem] text-muted-foreground">
+        {row.projectSlug}
+      </span>
     </td>
   )
 }
 
 const SyncedCell = ({ lastSyncedAt }: { readonly lastSyncedAt: string | null }) => (
-  <td className="border border-rule px-2 py-1 align-top">
+  <td className="border p-2 align-top">
     {lastSyncedAt === null ? (
-      <span className="text-faded italic underline decoration-dotted">never</span>
+      <span className="text-muted-foreground italic underline decoration-dotted">never</span>
     ) : (
       <time dateTime={lastSyncedAt} title={absoluteTime(lastSyncedAt)}>
         {relativeTime(lastSyncedAt)}
@@ -133,7 +135,7 @@ const SortableHeader = ({
   readonly onSort: (column: Column) => void
 }) => (
   <th
-    className="border border-rule px-2 py-1 text-left font-semibold"
+    className="border p-2 text-left font-semibold"
     aria-sort={state.column === column ? ARIA_SORT[state.direction] : "none"}
   >
     <button type="button" onClick={() => onSort(column)} className="hover:underline">
@@ -152,9 +154,9 @@ const SyncStatusTable = ({
   readonly onSort: (column: Column) => void
 }) => (
   <div className="mt-4 overflow-x-auto">
-    <table className="w-full border-collapse border border-rule text-[0.8125rem]">
+    <table className="w-full border-collapse border text-[0.8125rem]">
       <thead>
-        <tr className="bg-panel-2">
+        <tr className="bg-card-2">
           {COLUMNS.map((column) => (
             <SortableHeader key={column} column={column} state={state} onSort={onSort} />
           ))}
@@ -165,7 +167,7 @@ const SyncStatusTable = ({
           <tr key={`${row.userId}:${row.projectId ?? "none"}`}>
             <UserCell row={row} />
             <ProjectCell row={row} />
-            <td className="border border-rule px-2 py-1 align-top">{row.sessionCount}</td>
+            <td className="border p-2 align-top">{row.sessionCount}</td>
             <SyncedCell lastSyncedAt={row.lastSyncedAt} />
           </tr>
         ))}
@@ -203,7 +205,7 @@ const FilterBoxes = ({
 
 const ResultCount = ({ visible, total }: { readonly visible: number; readonly total: number }) =>
   visible === total ? null : (
-    <p className="mt-2 font-mono text-[0.72rem] text-ink-soft">
+    <p className="mt-2 font-mono text-[0.72rem] text-muted-foreground">
       {visible} of {total} rows
     </p>
   )

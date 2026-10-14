@@ -10,8 +10,8 @@ const NavItem = ({ to, children }: { to: string; children: ReactNode }) => (
     className={({ isActive }) =>
       `shrink-0 text-[0.8125rem] font-semibold transition-colors ${
         isActive
-          ? "text-ink underline decoration-stamp decoration-2 underline-offset-[6px]"
-          : "text-ink-soft hover:text-ink"
+          ? "text-foreground underline decoration-2 underline-offset-[6px]"
+          : "text-muted-foreground hover:text-foreground"
       }`
     }
   >
@@ -26,12 +26,12 @@ export const AppShell = ({ children }: { children: ReactNode }) => {
     <div className="relative z-10 flex min-h-dvh w-full flex-col">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-20 focus:rounded-xs focus:bg-panel-2 focus:px-3 focus:py-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-20 focus:rounded-xs focus:bg-card focus:px-3 focus:py-2"
       >
         Skip to content
       </a>
 
-      <header className="border-b border-rule bg-panel-2/80 px-4 py-3 sm:px-6">
+      <header className="border-b bg-card/80 px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-6 gap-y-2 max-sm:contents">
             <Link to="/projects" className="shrink-0 text-case-title font-semibold leading-tight">
@@ -62,9 +62,9 @@ export const AppShell = ({ children }: { children: ReactNode }) => {
         {children}
       </main>
 
-      <footer className="border-t border-rule-soft bg-panel-2/60 px-4 py-3 sm:px-6">
+      <footer className="border-t bg-card/60 px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-6 gap-y-2">
-          <p className="text-label uppercase text-ink-soft">samskara</p>
+          <p className="text-muted-foreground uppercase">samskara</p>
           <BuildStamp />
         </div>
       </footer>

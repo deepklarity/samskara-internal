@@ -639,7 +639,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())(
       expect(row?.sessionIds).toEqual(expect.arrayContaining([sessionId, "grouped-session-b"]))
       expect(row?.firstSeenAt).toBeDefined()
       expect(row?.lastSeenAt).toBeDefined()
-      expect(row?.statusBreakdown["candidate"]).toBe(1)
+      expect(row?.statusBreakdown.candidate).toBe(1)
     })
 
     test("V15: grouped view counts accepted + candidate and honors status filter", async () => {

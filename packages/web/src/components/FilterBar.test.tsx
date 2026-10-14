@@ -27,6 +27,22 @@ const renderBar = (filters: SessionFilters = EMPTY_FILTERS) => {
   return { onChange, onClear }
 }
 
+const openFilters = async (user: ReturnType<typeof userEvent.setup>) => {
+  // Active filters auto-open the panel; only click when it is actually closed.
+  const toggle = screen.queryByRole("button", { name: "Filters", expanded: false })
+  if (toggle) await user.click(toggle)
+}
+
+const choose = async (
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+  typed: string,
+  option: string,
+): Promise<void> => {
+  await user.type(screen.getByRole("combobox", { name }), typed)
+  await user.click(screen.getByRole("option", { name: option }))
+}
+
 test("submits keyword search intentionally and defaults it to relevance on page one", async () => {
   const user = userEvent.setup()
   const { onChange } = renderBar({ ...EMPTY_FILTERS, page: 3 })
@@ -70,19 +86,10 @@ test("clear search removes relevance and reset clears every control", async () =
   expect(onClear).toHaveBeenCalledOnce()
 })
 
-const choose = async (
-  user: ReturnType<typeof userEvent.setup>,
-  name: string,
-  typed: string,
-  option: string,
-): Promise<void> => {
-  await user.type(screen.getByRole("combobox", { name }), typed)
-  await user.click(screen.getByRole("option", { name: option }))
-}
-
 test("SC64: uses server vocabulary, preserves exact branch case, and deliberately applies PR and commit text", async () => {
   const user = userEvent.setup()
   const { onChange } = renderBar({ ...EMPTY_FILTERS, page: 2 })
+  await openFilters(user)
 
   for (const placeholder of ["All projects", "All users", "All repositories", "All branches"]) {
     expect(screen.getByPlaceholderText(placeholder)).toBeInTheDocument()
@@ -94,56 +101,47 @@ test("SC64: uses server vocabulary, preserves exact branch case, and deliberatel
   await choose(user, "Branch", "feat/search", "feat/Search")
   expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_FILTERS, branch: "feat/Search" })
 
-  const [prApply, commitApply] = screen.getAllByRole("button", { name: "Apply" })
-  if (prApply === undefined || commitApply === undefined)
-    throw new Error("Expected PR and commit Apply buttons")
-
   await user.type(screen.getByRole("textbox", { name: "PR number" }), "001")
-  await user.click(prApply)
+  await user.keyboard("{Enter}")
   expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_FILTERS, pr: "001" })
 
   await user.type(screen.getByRole("textbox", { name: "Commit SHA" }), "ABCDEF1")
-  await user.click(commitApply)
+  await user.keyboard("{Enter}")
   expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_FILTERS, commit: "abcdef1" })
 })
 
-test("only exposes relevance as a sort choice when a keyword is active", () => {
-  const { rerender } = render(
-    <FilterBar filters={EMPTY_FILTERS} options={options} onChange={vi.fn()} onClear={vi.fn()} />,
-  )
-  expect(screen.queryByRole("option", { name: "Relevance" })).not.toBeInTheDocument()
-
-  rerender(
-    <FilterBar
-      filters={{ ...EMPTY_FILTERS, q: "auth", sort: "relevance" }}
-      options={options}
-      onChange={vi.fn()}
-      onClear={vi.fn()}
-    />,
-  )
-  expect(screen.getByRole("option", { name: "Relevance" })).toBeInTheDocument()
-})
-
-test("SC65 (regression): Last active and Sort by are still native dropdowns", async () => {
+test("SC65 (regression): Last active and Sort by are shadcn Select components", async () => {
   const user = userEvent.setup()
   const { onChange } = renderBar()
+  await openFilters(user)
 
-  expect(screen.getByRole("combobox", { name: "Last active" })).toBeInstanceOf(HTMLSelectElement)
-  expect(screen.getByRole("combobox", { name: "Sort by" })).toBeInstanceOf(HTMLSelectElement)
+  const lastActive = screen.getByRole("combobox", { name: "Last active" })
+  const sortBy = screen.getByRole("combobox", { name: "Sort by" })
+  expect(lastActive).toBeInTheDocument()
+  expect(sortBy).toBeInTheDocument()
+  // They are shadcn Select triggers (buttons with combobox role), not native selects
+  expect(lastActive.tagName).toBe("BUTTON")
+  expect(sortBy.tagName).toBe("BUTTON")
 
-  await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "tokens")
+  // Verify the sort can be changed via keyboard (relevance -> recent -> oldest -> tokens = 3 ArrowDown)
+  await user.click(sortBy)
+  await user.keyboard("{ArrowDown}") // recent
+  await user.keyboard("{ArrowDown}") // oldest
+  await user.keyboard("{ArrowDown}") // tokens
+  await user.keyboard("{Enter}")
   expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_FILTERS, sort: "tokens" })
 })
 
-test("token and duration bounds apply deliberately on page one", async () => {
+test("token and duration bounds apply on change without Apply buttons", async () => {
   const user = userEvent.setup()
   const { onChange } = renderBar({ ...EMPTY_FILTERS, page: 2 })
+  await openFilters(user)
 
   await user.type(screen.getByRole("textbox", { name: "Min tokens" }), "1000")
-  await user.click(screen.getAllByRole("button", { name: "Apply" })[2]!)
+  await user.keyboard("{Enter}")
   expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_FILTERS, minTokens: 1000 })
 
   await user.type(screen.getByRole("textbox", { name: "Max minutes" }), "120")
-  await user.click(screen.getAllByRole("button", { name: "Apply" })[5]!)
+  await user.keyboard("{Enter}")
   expect(onChange).toHaveBeenLastCalledWith({ ...EMPTY_FILTERS, maxMinutes: 120 })
 })

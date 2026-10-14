@@ -38,15 +38,15 @@ const patchFailureMessage = (result: PatchResult): string | null => {
 
 const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="min-w-0">
-    <p className="text-label font-semibold text-ink-soft">{label}</p>
+    <p className="text-muted-foreground font-semibold">{label}</p>
     <p className="truncate font-mono text-[0.9375rem]">{children}</p>
   </div>
 )
 
 const ErrorState = ({ error }: { error: ApiError }) => (
-  <section className="border border-err/40 bg-panel p-6">
-    <p className="text-label font-semibold text-err">Retrieval failed</p>
-    <p className="mt-2 text-ink-soft">{error.message}</p>
+  <section className="border border-destructive/40 bg-card p-6">
+    <p className="text-muted-foreground font-semibold">Retrieval failed</p>
+    <p className="mt-2 text-muted-foreground">{error.message}</p>
   </section>
 )
 
@@ -142,14 +142,14 @@ export const OrgDetail = () => {
         {settings?.saved.name ?? org.name}
       </h1>
       {(settings?.saved.name ?? org.name) === org.githubSlug ? null : (
-        <p className="mt-1 font-mono text-[0.78rem] text-custody">{org.githubSlug}</p>
+        <p className="mt-1 font-mono text-sm text-muted-foreground">{org.githubSlug}</p>
       )}
 
       {/* biome-ignore lint/a11y/useSemanticElements: a plain div grouping Field pairs, not a form */}
       <div
         role="group"
         aria-label="Org totals"
-        className="mt-4 grid grid-cols-2 gap-4 bg-panel-2 p-4 min-[560px]:grid-cols-4"
+        className="mt-4 grid grid-cols-2 gap-4 bg-card p-4 min-[560px]:grid-cols-4"
       >
         <Field label="Sessions">{org.sessionCount}</Field>
         <Field label="Members">{org.members.length}</Field>
@@ -158,16 +158,16 @@ export const OrgDetail = () => {
 
       <h2 className="mt-6 text-lead font-semibold">Projects</h2>
       {org.projects.length === 0 ? (
-        <p className="mt-2 border border-rule-soft bg-panel p-4 text-ink-soft">
+        <p className="mt-2 border bg-card p-4 text-muted-foreground">
           This org owns no projects yet. A project becomes the org's when someone runs{" "}
-          <code className="font-mono text-[0.78rem]">samskara enable</code> in a repository under{" "}
-          <span className="font-mono text-[0.78rem] text-custody">{org.githubSlug}</span>.
+          <code className="font-mono text-sm">samskara enable</code> in a repository under{" "}
+          <span className="font-mono text-sm text-muted-foreground">{org.githubSlug}</span>.
         </p>
       ) : (
         <ul className="mt-4 grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 min-[840px]:grid-cols-3">
           {org.projects.map((project) => (
             <li key={project.id}>
-              <Card className="flex w-full flex-col gap-3 bg-panel-2 p-4 transition-colors focus-within:border-ink-soft hover:border-ink-soft">
+              <Card className="flex w-full flex-col gap-3 bg-card p-4 focus-within:border-muted-foreground hover:border-muted-foreground">
                 <div className="min-w-0">
                   <h3 className="truncate text-lead font-semibold">
                     <Link
@@ -177,13 +177,15 @@ export const OrgDetail = () => {
                       {project.name}
                     </Link>
                   </h3>
-                  <p className="truncate font-mono text-[0.78rem] text-custody">/{project.slug}</p>
+                  <p className="truncate font-mono text-sm text-muted-foreground">
+                    /{project.slug}
+                  </p>
                 </div>
                 <Field label="Sessions">{project.sessionCount}</Field>
                 {project.sessionCount === 0 ? null : (
                   <Link
                     to={`/sessions?project=${encodeURIComponent(project.id)}`}
-                    className="block border-t border-rule-soft pt-2 text-[0.78rem] font-semibold text-custody hover:underline"
+                    className="block border-t border pt-2 text-sm font-semibold text-muted-foreground hover:underline"
                   >
                     View sessions
                   </Link>
@@ -196,20 +198,17 @@ export const OrgDetail = () => {
 
       <h2 className="mt-6 text-lead font-semibold">Members</h2>
       {org.members.length === 0 ? (
-        <p className="mt-2 border border-rule-soft bg-panel p-4 text-ink-soft">
+        <p className="mt-2 border bg-card p-4 text-muted-foreground">
           Nobody has signed in from this org yet.
         </p>
       ) : (
         <ul className="mt-2 flex flex-wrap gap-3">
           {org.members.map((member) => (
-            <li
-              key={member.id}
-              className="flex items-center gap-2 border border-rule bg-panel-2 px-3 py-2"
-            >
+            <li key={member.id} className="flex items-center gap-2 border bg-card px-3 py-2">
               {member.avatarUrl ? (
                 <img src={member.avatarUrl} alt="" className="h-6 w-6 rounded-full" />
               ) : null}
-              <span className="font-mono text-[0.78rem]">{member.githubLogin}</span>
+              <span className="text-sm">{member.githubLogin}</span>
             </li>
           ))}
         </ul>
@@ -218,17 +217,14 @@ export const OrgDetail = () => {
       {settings === null ? null : (
         <>
           <h2 className="mt-8 text-lead font-semibold">Settings</h2>
-          <div className="mt-2 border border-rule-soft bg-panel">
-            <div className="border-b border-rule-soft p-4">
-              <label
-                htmlFor="org-name-input"
-                className="block text-label font-semibold text-ink-soft"
-              >
+          <div className="mt-2 border bg-card">
+            <div className="border-b border bg-card p-4">
+              <label htmlFor="org-name-input" className="block text-muted-foreground font-semibold">
                 Display name
               </label>
-              <p className="mt-1 text-ink-soft">
+              <p className="mt-1 text-muted-foreground">
                 Shown wherever this org appears. Leave it empty to fall back to{" "}
-                <span className="font-mono text-[0.78rem] text-custody">{org.githubSlug}</span>.
+                <span className="font-mono text-sm text-muted-foreground">{org.githubSlug}</span>.
               </p>
               <input
                 id="org-name-input"
@@ -237,11 +233,11 @@ export const OrgDetail = () => {
                 disabled={settings.pending}
                 onChange={(event) => edit({ name: event.target.value })}
                 autoComplete="off"
-                className="mt-3 w-full max-w-sm border border-rule bg-panel-2 px-3 py-2 font-mono text-[0.9375rem]"
+                className="mt-3 w-full max-w-sm border bg-card px-3 py-2 font-mono text-sm"
               />
             </div>
 
-            <div className="border-b border-rule-soft p-4">
+            <div className="border-b border bg-card p-4">
               <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1">
                 <input
                   type="checkbox"
@@ -252,9 +248,11 @@ export const OrgDetail = () => {
                 />
                 <span>
                   <span className="font-semibold">Add new GitHub members automatically</span>
-                  <span className="mt-1 block text-ink-soft">
+                  <span className="mt-1 block text-muted-foreground">
                     Anyone who joins{" "}
-                    <span className="font-mono text-[0.78rem] text-custody">{org.githubSlug}</span>{" "}
+                    <span className="font-mono text-sm text-muted-foreground">
+                      {org.githubSlug}
+                    </span>{" "}
                     on GitHub gets access to every project this org owns, from their next sign-in.
                     Leave it off to admit people one at a time.
                   </span>
@@ -275,18 +273,18 @@ export const OrgDetail = () => {
                 <button
                   type="button"
                   onClick={() => setSettings({ ...settings, draft: settings.saved, error: null })}
-                  className="min-h-11 px-2 py-2 text-[0.78rem] font-semibold text-ink-soft hover:underline"
+                  className="min-h-11 px-2 py-2 text-sm font-semibold text-muted-foreground hover:underline"
                 >
                   Discard
                 </button>
               ) : null}
               {settings.acknowledged && !dirty ? (
-                <output className="text-label font-semibold text-ok">Saved</output>
+                <output className="text-muted-foreground font-semibold">Saved</output>
               ) : null}
             </div>
 
             {settings.error ? (
-              <p role="alert" className="border-t border-err/40 bg-panel-2 p-4 text-err">
+              <p role="alert" className="border-t border bg-card p-4 text-destructive">
                 {settings.error}
               </p>
             ) : null}

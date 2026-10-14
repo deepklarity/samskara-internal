@@ -8,7 +8,7 @@ import { useAuth } from "../auth/AuthProvider.js"
 import { Button } from "../components/ui/button.js"
 
 const ITEM_CLASS =
-  "block w-full px-3 py-2 text-left text-[0.78rem] hover:bg-panel focus:bg-panel focus-visible:outline-none"
+  "block w-full px-3 py-2 text-left text-[0.78rem] hover:bg-card focus:bg-card focus-visible:outline-none"
 
 const itemsWithin = (menu: HTMLElement | null): ReadonlyArray<HTMLElement> =>
   menu ? Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')) : []
@@ -109,9 +109,9 @@ export const AccountMenu = ({ user }: { user: CurrentUser }) => {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
-        className="font-mono text-[0.78rem] text-ink-soft max-sm:max-w-[45vw] max-sm:truncate"
+        className="font-mono text-[0.78rem] text-muted-foreground max-sm:max-w-[45vw] max-sm:truncate"
       >
-        <span className="text-custody">signed in</span> / {user.githubLogin}
+        <span className="text-muted-foreground">signed in</span> / {user.githubLogin}
       </Button>
 
       {open ? (
@@ -119,9 +119,9 @@ export const AccountMenu = ({ user }: { user: CurrentUser }) => {
           ref={menuRef}
           role="menu"
           aria-label="Account"
-          className="absolute right-0 z-20 mt-1 w-56 border border-rule bg-panel-2 py-1 shadow-overlay"
+          className="absolute right-0 z-20 mt-1 w-56 border bg-card py-1 rounded-md"
         >
-          <p className="border-b border-rule-soft px-3 py-2 font-mono text-[0.78rem] text-ink-soft">
+          <p className="border-b rounded-md px-3 py-2 font-mono text-muted-foreground">
             {user.githubLogin}
           </p>
           <button type="button" role="menuitem" onClick={onPair} className={ITEM_CLASS}>
@@ -131,7 +131,10 @@ export const AccountMenu = ({ user }: { user: CurrentUser }) => {
             Log out
           </button>
           {error ? (
-            <p role="alert" className="border-t border-rule-soft px-3 py-2 text-[0.78rem] text-err">
+            <p
+              role="alert"
+              className="border-t rounded-md px-3 py-2 text-[0.78rem] text-destructive"
+            >
               {error.message}
             </p>
           ) : null}

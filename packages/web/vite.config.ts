@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { readFileSync } from "node:fs"
+import path from "node:path"
 import { fileURLToPath } from "node:url"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
@@ -35,7 +36,17 @@ export default defineConfig(({ mode }) => {
 
   return {
     envDir,
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      // shadcn's `@/` import alias (components.json) resolves here as well as in tsconfig.
+      {
+        name: "alias-@",
+        resolve(id: string) {
+          if (id.startsWith("@/")) return path.resolve(__dirname, "src", id.slice(2))
+        },
+      },
+    ],
     define: {
       "import.meta.env.VITE_APP_VERSION": JSON.stringify(version),
       "import.meta.env.VITE_GIT_COMMIT": JSON.stringify(commit),

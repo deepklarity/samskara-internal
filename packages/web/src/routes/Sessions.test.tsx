@@ -85,10 +85,13 @@ const renderAt = (path: string) =>
 
 // Two kinds of control share the combobox role now, and each helper insists on its own kind:
 // a loose helper serving both would stop catching a control silently becoming the wrong element.
-const control = (name: RegExp): HTMLSelectElement => {
-  const element = screen.getByRole("combobox", { name })
-  if (!(element instanceof HTMLSelectElement)) throw new Error(`${name} is not a select`)
-  return element
+// "Last active" is a Radix Select: the trigger is a button role=combobox whose value shows
+// as its visible label text, not an HTMLSelectElement .value.
+const control = (name: RegExp): HTMLElement => screen.getByRole("combobox", { name })
+
+const openFilters = async (): Promise<void> => {
+  const toggle = screen.queryByRole("button", { name: /filters/i, expanded: false })
+  if (toggle) await userEvent.click(toggle)
 }
 
 const filterBox = (label: string): HTMLInputElement => {
@@ -98,11 +101,13 @@ const filterBox = (label: string): HTMLInputElement => {
 }
 
 const chooseFilter = async (label: string, option: string): Promise<void> => {
+  await openFilters()
   await userEvent.type(filterBox(label), option)
   await userEvent.click(await screen.findByRole("option", { name: option }))
 }
 
 const clearFilter = async (label: string): Promise<void> => {
+  await openFilters()
   await userEvent.click(screen.getByRole("button", { name: `Clear ${label}` }))
 }
 
@@ -132,9 +137,11 @@ test("SC66 (S23): loading /sessions?project=p&user=u&range=week seeds every cont
   // The box seeds from the raw query value and only acquires its label once the response's
   // filterOptions land, so this is a wait, not a read: asserting straight through raced the
   // upgrade and read back "samskara" on a loaded runner.
+  await openFilters()
   await waitFor(() => expect(filterBox("Project").value).toBe("Samskara"))
+  await openFilters()
   expect(filterBox("User").value).toBe("maya")
-  expect(control(/last active/i).value).toBe("week")
+  expect(control(/last active/i)).toHaveTextContent(/7 days/i)
 })
 
 test("S23: the request sent to the server carries the same filters the URL declared", async () => {
@@ -185,9 +192,11 @@ test("S25: an empty result keeps the filter values and offers a clear-filters ac
   // The box seeds from the raw query value and only acquires its label once the response's
   // filterOptions land, so this is a wait, not a read: asserting straight through raced the
   // upgrade and read back "samskara" on a loaded runner.
+  await openFilters()
   await waitFor(() => expect(filterBox("Project").value).toBe("Samskara"))
+  await openFilters()
   expect(filterBox("User").value).toBe("maya")
-  expect(control(/last active/i).value).toBe("week")
+  expect(control(/last active/i)).toHaveTextContent(/7 days/i)
 
   await userEvent.click(screen.getByRole("button", { name: /clear filters/i }))
 
@@ -378,6 +387,7 @@ test("SC69 (S25, regression): with user=maya applied, ravi is still offered - op
 
   await openMenu("User")
   await waitFor(() => expect(offered()).toContain("ravi"))
+  await openFilters()
   expect(filterBox("User").value).toBe("maya")
   expect(screen.queryByRole("link", { name: /trim the ingest pipeline/i })).not.toBeInTheDocument()
 })

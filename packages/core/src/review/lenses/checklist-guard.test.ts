@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { type ToolFailureChecklistResult, validateToolFailureChecklist } from "./checklist-guard.js"
+import { validateToolFailureChecklist } from "./checklist-guard.js"
 import type { AgentLearning, AiReviewPayload } from "./schema.js"
 
 const timelineLens: AiReviewPayload["lenses"][number] = {

@@ -72,7 +72,7 @@ type State =
   | { readonly phase: "failed"; readonly error: ApiError }
 
 const Unavailable = () => (
-  <span className="text-faded italic underline decoration-dotted">unavailable</span>
+  <span className="text-muted-foreground italic underline decoration-dotted">unavailable</span>
 )
 
 const formatDuration = (ms: number): string => {
@@ -85,7 +85,7 @@ const formatDuration = (ms: number): string => {
 
 const Fact = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className="flex flex-col gap-1">
-    <dt className="text-label font-semibold text-faded">{label}</dt>
+    <dt className="text-foreground font-semibold text-muted-foreground">{label}</dt>
     <dd className="font-mono text-[0.875rem] tabular-nums">{value}</dd>
   </div>
 )
@@ -162,7 +162,7 @@ const SessionEditForm = ({
         event.preventDefault()
         onSave()
       }}
-      className="mt-2 flex max-w-[62ch] flex-col gap-2 border border-rule bg-panel-2 p-3"
+      className="mt-2 flex max-w-[62ch] flex-col gap-2 border border bg-card-2 p-3"
     >
       <EditField
         id={nameId}
@@ -182,7 +182,7 @@ const SessionEditForm = ({
         <button
           type="submit"
           disabled={edit.pending}
-          className="border border-rule bg-panel px-3 py-1.5 text-[0.72rem] font-semibold disabled:opacity-60"
+          className="border border bg-card px-3 py-1.5 text-[0.72rem] font-semibold disabled:opacity-60"
         >
           {edit.pending ? "Saving…" : "Save"}
         </button>
@@ -190,13 +190,13 @@ const SessionEditForm = ({
           type="button"
           onClick={onCancel}
           disabled={edit.pending}
-          className="px-1 py-1.5 text-[0.72rem] font-semibold text-ink-soft hover:underline"
+          className="px-1 py-1.5 text-[0.72rem] font-semibold text-muted-foreground hover:underline"
         >
           Cancel
         </button>
       </div>
       {edit.error === null ? null : (
-        <p role="alert" className="text-[0.78rem] text-err">
+        <p role="alert" className="text-[0.78rem] text-destructive">
           {edit.error}
         </p>
       )}
@@ -238,51 +238,53 @@ const SessionHead = ({
     session.aiTitle !== session.name
 
   return (
-    <header ref={measure} className="sticky top-0 z-30 bg-paper pb-2 pt-2">
-      <nav aria-label="Breadcrumb" className="mb-1 font-mono text-[0.72rem] text-ink-soft">
-        <Link to="/projects" className="text-custody hover:underline">
+    <header ref={measure} className="sticky top-0 z-30 bg-background pb-2 pt-2">
+      <nav aria-label="Breadcrumb" className="mb-1 font-mono text-[0.72rem] text-muted-foreground">
+        <Link to="/projects" className="text-foreground hover:underline">
           Projects
         </Link>
-        <span aria-hidden="true" className="px-2 text-rule">
+        <span aria-hidden="true" className="px-2 text-muted-foreground">
           /
         </span>
         <Link
           to={`/sessions?project=${encodeURIComponent(session.projectId)}`}
-          className="text-custody hover:underline"
+          className="text-foreground hover:underline"
         >
           {session.projectName}
         </Link>
-        <span aria-hidden="true" className="px-2 text-rule">
+        <span aria-hidden="true" className="px-2 text-muted-foreground">
           /
         </span>
-        <Link to="/sessions" className="text-custody hover:underline">
+        <Link to="/sessions" className="text-foreground hover:underline">
           All sessions
         </Link>
       </nav>
       <div className="flex items-start gap-2">
         <h1
           title={session.title ?? undefined}
-          className="max-w-[62ch] truncate text-case-title font-semibold leading-tight max-sm:whitespace-normal"
+          className="max-w-[62ch] truncate text-lg font-semibold font-semibold leading-tight max-sm:whitespace-normal"
         >
-          {session.title ?? <span className="text-faded italic">untitled session</span>}
+          {session.title ?? <span className="text-muted-foreground italic">untitled session</span>}
         </h1>
         {edit === null && session.canRename ? (
           <button
             type="button"
             onClick={() => setEdit({ draft: draftOf(session), pending: false, error: null })}
-            className="mt-1 shrink-0 text-[0.72rem] font-semibold text-custody hover:underline"
+            className="mt-1 shrink-0 text-[0.72rem] font-semibold text-foreground hover:underline"
           >
             [edit]
           </button>
         ) : null}
       </div>
       {showAiTitle ? (
-        <p className="mt-0.5 max-w-[62ch] truncate font-mono text-[0.72rem] text-ink-soft">
+        <p className="mt-0.5 max-w-[62ch] truncate font-mono text-[0.72rem] text-muted-foreground">
           AI title: {session.aiTitle}
         </p>
       ) : null}
       {edit !== null || session.description === null ? null : (
-        <p className="mt-1 max-w-[62ch] text-[0.82rem] text-ink-soft">{session.description}</p>
+        <p className="mt-1 max-w-[62ch] text-[0.82rem] text-muted-foreground">
+          {session.description}
+        </p>
       )}
       {edit === null ? null : (
         <SessionEditForm
@@ -297,16 +299,16 @@ const SessionHead = ({
 }
 
 const Masthead = ({ session, tokens }: { session: SessionFacts; tokens: TokenTotals }) => (
-  <div className="border-b-2 border-ink pb-4">
-    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[0.78rem] text-ink-soft">
+  <div className="border-b-2 border-primary pb-4">
+    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[0.78rem] text-muted-foreground">
       <span>{session.projectName}</span>
-      <span aria-hidden="true" className="text-rule">
+      <span aria-hidden="true" className="text-muted-foreground">
         ·
       </span>
       <span>{session.userLogin}</span>
       {session.repo === null ? null : (
         <>
-          <span aria-hidden="true" className="text-rule">
+          <span aria-hidden="true" className="text-muted-foreground">
             ·
           </span>
           <RepoLink repo={session.repo} />
@@ -319,7 +321,7 @@ const Masthead = ({ session, tokens }: { session: SessionFacts; tokens: TokenTot
     <dl
       role="group"
       aria-label="Session facts"
-      className="mt-4 grid w-fit max-w-full grid-cols-2 gap-x-6 gap-y-3 border-t border-rule pt-3 min-[560px]:grid-cols-3 min-[900px]:grid-cols-4 min-[1200px]:grid-cols-7"
+      className="mt-4 grid w-fit max-w-full grid-cols-2 gap-x-6 gap-y-3 border-t border pt-3 min-[560px]:grid-cols-3 min-[900px]:grid-cols-4 min-[1200px]:grid-cols-7"
     >
       {/* The timestamp is the longest value: on narrow viewports it spans both
       columns instead of wrapping cramped inside one. */}
@@ -343,11 +345,11 @@ const Masthead = ({ session, tokens }: { session: SessionFacts; tokens: TokenTot
 )
 
 const NotFound = ({ onBack }: { onBack: () => void }) => (
-  <Card className="border-stamp/40 bg-panel">
+  <Card className="border-amber-600/40 bg-card">
     <CardContent className="p-8 text-center">
-      <p className="text-label font-semibold text-stamp">Nothing on file</p>
-      <h2 className="mt-2 text-lead font-semibold">No such session</h2>
-      <p className="mx-auto mt-2 max-w-md text-ink-soft">
+      <p className="text-foreground font-semibold text-amber-600">Nothing on file</p>
+      <h2 className="mt-2 text-foreground font-semibold">No such session</h2>
+      <p className="mx-auto mt-2 max-w-md text-muted-foreground">
         It either does not exist or has not been shared with you.
       </p>
       <Button type="button" onClick={onBack} className="mt-4">
@@ -358,10 +360,10 @@ const NotFound = ({ onBack }: { onBack: () => void }) => (
 )
 
 const ErrorState = ({ error }: { error: ApiError }) => (
-  <Card className="border-err/40 bg-panel">
+  <Card className="border-destructive/40 bg-card">
     <CardContent className="p-6">
-      <p className="text-label font-semibold text-err">Retrieval failed</p>
-      <p className="mt-2 text-ink-soft">{error.message}</p>
+      <p className="text-foreground font-semibold text-destructive">Retrieval failed</p>
+      <p className="mt-2 text-muted-foreground">{error.message}</p>
     </CardContent>
   </Card>
 )
@@ -375,7 +377,9 @@ const capturedRows = (state: CapturedState): ReadonlyArray<CapturedArtifact> =>
   state.phase === "ready" ? state.rows : []
 
 const Notice = ({ children }: { children: React.ReactNode }) => (
-  <p className="mb-4 border border-dashed border-err/50 bg-panel p-4 text-ink-soft">{children}</p>
+  <p className="mb-4 border border-dashed border-destructive/50 bg-card p-4 text-muted-foreground">
+    {children}
+  </p>
 )
 
 // Captured files and transcript frame-links are two independent signals shown in one browser;
@@ -423,7 +427,7 @@ const InlineToolsToggle = ({
   checked: boolean
   onChange: (next: boolean) => void
 }) => (
-  <label className="flex w-fit shrink-0 cursor-pointer items-center gap-2 pb-2 text-[0.78rem] text-ink-soft">
+  <label className="flex w-fit shrink-0 cursor-pointer items-center gap-2 pb-2 text-[0.78rem] text-muted-foreground">
     <input
       type="checkbox"
       checked={checked}
@@ -624,18 +628,18 @@ export const verdictSentence = (outcome: string, friction: string): string => {
 // productive, struggled, aborted) stays internal — it picks the sentence and the color —
 // but never renders, because a bare "aborted" reads as jargon without the definitions.
 const OUTCOME_DOT: Readonly<Record<string, string>> = {
-  shipped: "bg-ok",
-  productive: "bg-ok",
-  struggled: "bg-warn",
-  aborted: "bg-err",
-  clarified: "bg-custody",
+  shipped: "bg-emerald-100",
+  productive: "bg-emerald-100",
+  struggled: "bg-amber-100",
+  aborted: "bg-destructive",
+  clarified: "bg-card",
 }
 
 const Verdict = ({ outcome, friction }: { outcome: string; friction: string }) => (
   <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
     <span
       aria-hidden="true"
-      className={`size-2 shrink-0 rounded-full ${OUTCOME_DOT[outcome] ?? "bg-faded"}`}
+      className={`size-2 shrink-0 rounded-full ${OUTCOME_DOT[outcome] ?? "bg-card"}`}
     />
     <span className="text-[1.0625rem] font-semibold leading-snug">
       {verdictSentence(outcome, friction)}
@@ -673,7 +677,7 @@ const MetaChip = ({ children }: { children: React.ReactNode }) => (
 // Each chip renders only when its count is present, so a partial numbers block degrades
 // to fewer chips rather than zeros.
 const NumbersLine = ({ numbers }: { numbers: AiReviewNumbers }) => (
-  <p className="mt-3 flex flex-wrap gap-x-2 gap-y-1 font-mono text-[0.72rem] text-ink-soft">
+  <p className="mt-3 flex flex-wrap gap-x-2 gap-y-1 font-mono text-[0.72rem] text-muted-foreground">
     {numbers.durationMs === undefined ? null : (
       <MetaChip>{formatClock(numbers.durationMs)}</MetaChip>
     )}
@@ -733,7 +737,7 @@ const PartialBanner = ({
 }) => {
   const dropped = droppedLearnings(recovered)
   return (
-    <p className="mt-3 border border-dashed border-err/50 bg-panel px-3 py-2 text-[0.82rem] text-ink-soft">
+    <p className="mt-3 border border-dashed border-destructive/50 bg-card px-3 py-2 text-[0.82rem] text-muted-foreground">
       The reviewer reported writing {sumCounts(partial.claimed)} entries;{" "}
       {sumCounts(partial.parsed)} survived validation
       {dropped.length === 0
@@ -756,13 +760,13 @@ const PartialBanner = ({
 // warning; clean stretches keep the kind color (turning points stay accented).
 const STRIP_TONE: Readonly<Record<string, string | null>> = {
   good: null,
-  failure: "bg-err",
-  slow: "bg-warn",
+  failure: "bg-destructive",
+  slow: "bg-amber-100",
 }
 const STRIP_SEGMENT: Readonly<Record<AiTimelineEntryKind, string>> = {
-  phase: "bg-faded",
-  event: "bg-faded",
-  "turning-point": "bg-stamp",
+  phase: "bg-card",
+  event: "bg-card",
+  "turning-point": "bg-amber-600",
 }
 
 /**
@@ -808,7 +812,7 @@ const TimeStrip = ({
   return (
     <section className="mt-4">
       <LensHeading>Where the time went</LensHeading>
-      <div className="flex h-2.5 w-full overflow-hidden rounded-pill border border-rule bg-panel-2">
+      <div className="flex h-2.5 w-full overflow-hidden rounded-pill border border bg-card-2">
         {timed
           .filter((entry) => !isIdleSpan(entry))
           .map((entry) => (
@@ -822,7 +826,9 @@ const TimeStrip = ({
             />
           ))}
       </div>
-      {share === null ? null : <p className="mt-1.5 text-[0.82rem] text-ink-soft">{share}</p>}
+      {share === null ? null : (
+        <p className="mt-1.5 text-[0.82rem] text-muted-foreground">{share}</p>
+      )}
     </section>
   )
 }
@@ -847,11 +853,11 @@ const displayReviewText = (value: string): string =>
 // strip and the turning points still stand out. Each row also carries its own segment
 // bar, proportional to the entry's share of the tracked timeline spans.
 const RAIL_DOT_TONE: Readonly<Record<string, string>> = {
-  failure: "bg-err",
-  slow: "bg-warn",
+  failure: "bg-destructive",
+  slow: "bg-amber-100",
 }
 const railDotOf = (kind: AiTimelineEntryKind, tone: string): string =>
-  RAIL_DOT_TONE[tone] ?? (kind === "turning-point" ? "bg-stamp" : "bg-faded")
+  RAIL_DOT_TONE[tone] ?? (kind === "turning-point" ? "bg-amber-600" : "bg-card")
 
 /** How many timeline rows render before the "show all" toggle takes over. */
 const visibleTimelineEntries = (
@@ -889,28 +895,28 @@ const TimelineEntryRow = ({
         data-testid="timeline-dot"
         data-tone={tone}
         aria-hidden="true"
-        className={`absolute -left-[27px] top-4 size-3 rounded-full border-2 border-panel ${railDotOf(entry.kind, tone)}`}
+        className={`absolute -left-[27px] top-4 size-3 rounded-full border-2 border ${railDotOf(entry.kind, tone)}`}
       />
       <span className="min-w-0">
-        <span className="block text-lead font-semibold leading-snug">
+        <span className="block text-foreground font-semibold leading-snug">
           {displayReviewText(entry.title)}
         </span>
-        <span className="mt-0.5 block font-mono text-[0.72rem] tabular-nums text-ink-soft">
+        <span className="mt-0.5 block font-mono text-[0.72rem] tabular-nums text-muted-foreground">
           {meta}
         </span>
         {pct === null ? null : (
           <span title={`${pct}% of timeline`} style={{ width: `${pct}%` }} className="mt-1.5 block">
-            <Progress value={pct} aria-hidden="true" className="h-1.5 border border-rule-soft" />
+            <Progress value={pct} aria-hidden="true" className="h-1.5 border border-soft" />
           </span>
         )}
-        <span className="mt-1 block text-[0.82rem] text-ink-soft">
+        <span className="mt-1 block text-[0.82rem] text-muted-foreground">
           {displayReviewText(entry.summary)}
         </span>
       </span>
     </>
   )
   return (
-    <li className="relative border border-rule bg-panel transition-colors hover:border-ink-soft">
+    <li className="relative border border bg-card transition-colors hover:border-primary-soft">
       {href === null ? (
         <div className="flex gap-3 p-3">{body}</div>
       ) : (
@@ -940,7 +946,7 @@ const TimelineSection = ({
       <LensHeading>Timeline</LensHeading>
       <ol
         aria-label="review timeline"
-        className="relative ml-1.5 flex flex-col gap-2 border-l-2 border-rule pl-5"
+        className="relative ml-1.5 flex flex-col gap-2 border-l-2 border pl-5"
       >
         {visible.map((entry) => {
           const firstMessageId = entry.messageIds[0]
@@ -966,9 +972,9 @@ const Chip = ({ tone, children }: { tone: string; children: React.ReactNode }) =
 )
 
 const SEVERITY_TONE: Readonly<Record<string, string>> = {
-  low: "border-rule text-ink-soft",
-  medium: "border-warn/40 text-warn",
-  high: "border-err/40 text-err",
+  low: "border text-muted-foreground",
+  medium: "border-amber-100/40 text-amber-600",
+  high: "border-destructive/40 text-destructive",
 }
 
 /** Severity reads as a word, not a whisper: "Medium" is a label, "medium" is a hint. */
@@ -998,30 +1004,32 @@ const LearningRow = ({
 }) => {
   if (isNothingEntry(learning.title)) {
     return (
-      <li className="border border-dashed border-rule bg-panel px-3 py-2">
-        <p className="text-[0.875rem] text-ink-soft">{displayReviewText(learning.title)}</p>
+      <li className="border border-dashed border bg-card px-3 py-2">
+        <p className="text-[0.875rem] text-muted-foreground">{displayReviewText(learning.title)}</p>
       </li>
     )
   }
 
   return (
-    <li className="border border-rule bg-panel p-3">
+    <li className="border border bg-card p-3">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         {learning.severity === undefined ? null : (
-          <Chip tone={SEVERITY_TONE[learning.severity] ?? "border-rule text-ink-soft"}>
+          <Chip tone={SEVERITY_TONE[learning.severity] ?? "border text-muted-foreground"}>
             {SEVERITY_LABEL[learning.severity] ?? learning.severity}
           </Chip>
         )}
-        <span className="text-lead font-semibold leading-snug">
+        <span className="text-foreground font-semibold leading-snug">
           {displayReviewText(learning.title)}
         </span>
         {learning.cost === undefined ? null : (
-          <span className="text-evidence text-ink-soft">{learning.cost}</span>
+          <span className="text-muted-foreground text-muted-foreground">{learning.cost}</span>
         )}
       </div>
-      <p className="mt-1.5 text-[0.82rem] text-ink-soft">{displayReviewText(learning.detail)}</p>
+      <p className="mt-1.5 text-[0.82rem] text-muted-foreground">
+        {displayReviewText(learning.detail)}
+      </p>
       {learning.nextTime === undefined || learning.nextTime.trim() === "" ? null : (
-        <p className="mt-1.5 text-[0.82rem] text-ink">
+        <p className="mt-1.5 text-[0.82rem] text-foreground">
           <span className="font-semibold">Next time:</span> {displayReviewText(learning.nextTime)}
         </p>
       )}
@@ -1036,8 +1044,8 @@ const LearningRow = ({
             const clipped = what.length > 48 ? `${what.slice(0, 48).trimEnd()}…` : what
             const anchor = (
               <>
-                <span className="font-mono text-faded">seq {item.seq}</span>
-                <span className="text-faded">{clipped}</span>
+                <span className="font-mono text-muted-foreground">seq {item.seq}</span>
+                <span className="text-muted-foreground">{clipped}</span>
               </>
             )
             return (
@@ -1053,7 +1061,7 @@ const LearningRow = ({
                   <Link
                     to={href}
                     title={what}
-                    className="inline-flex max-w-full items-baseline gap-1.5 border-b border-transparent text-[0.78rem] hover:border-custody max-sm:whitespace-nowrap"
+                    className="inline-flex max-w-full items-baseline gap-1.5 border-b border-transparent text-[0.78rem] hover:border-card max-sm:whitespace-nowrap"
                   >
                     {anchor}
                   </Link>
@@ -1064,7 +1072,7 @@ const LearningRow = ({
         </ul>
       )}
       {lesson === undefined ? null : (
-        <p className="mt-2 text-[0.72rem] text-faded">
+        <p className="mt-2 text-[0.72rem] text-muted-foreground">
           <StatusWord status={lesson.status} />
           {` · seen ${lesson.occurrenceCount} ${lesson.occurrenceCount === 1 ? "time" : "times"}`}
           {` · ${LESSON_AUDIENCE_LABEL[lesson.audience] ?? lesson.audience} · ${lesson.category}`}
@@ -1075,7 +1083,7 @@ const LearningRow = ({
 }
 
 const LensHeading = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="mb-2 text-label font-semibold text-faded">{children}</h3>
+  <h3 className="mb-2 text-foreground font-semibold text-muted-foreground">{children}</h3>
 )
 
 type CodeAwareImprovement = NonNullable<AiReviewSignals["improvements"]>["entries"][number]
@@ -1088,10 +1096,10 @@ const IMPROVEMENT_STATUS_LABEL: Record<CodeAwareImprovement["status"], string> =
 }
 
 const IMPROVEMENT_STATUS_TONE: Record<CodeAwareImprovement["status"], string> = {
-  "already-present": "border-custody/40 bg-custody/5 text-custody",
-  "resolved-in-session": "border-ok/40 bg-ok/10 text-ok",
-  pending: "border-warn/40 bg-warn/10 text-warn",
-  unverified: "border-rule bg-panel text-ink-soft",
+  "already-present": "border-card/40 bg-card/5 text-foreground",
+  "resolved-in-session": "border-emerald-100/40 bg-emerald-100/10 text-emerald-600",
+  pending: "border-amber-100/40 bg-amber-100/10 text-amber-600",
+  unverified: "border bg-card text-muted-foreground",
 }
 
 const codeLocationOf = (citation: CodeAwareImprovement["codeEvidence"][number]): string => {
@@ -1149,7 +1157,7 @@ const CodeInsight = ({ item }: { item: CodeAwareImprovement }) => {
     highlighted.push(
       <code
         key={`code-${match.index}`}
-        className="rounded-xs border border-custody/40 bg-panel px-1 py-0.5 font-mono text-[0.75rem] text-custody"
+        className="rounded-xs border border-card/40 bg-card px-1 py-0.5 font-mono text-[0.75rem] text-foreground"
       >
         {match[0]}
       </code>,
@@ -1178,13 +1186,13 @@ const CodeInsight = ({ item }: { item: CodeAwareImprovement }) => {
           {remaining.slice(0, 3).map((citation) => (
             <span
               key={`${citation.repo}:${citation.path}:${citation.revision}`}
-              className="max-w-full truncate border border-custody/40 bg-panel px-1.5 py-0.5 font-mono text-[0.68rem] text-custody"
+              className="max-w-full truncate border border-card/40 bg-card px-1.5 py-0.5 font-mono text-[0.68rem] text-foreground"
             >
               {codeLocationOf(citation)}
             </span>
           ))}
           {remaining.length <= 3 ? null : (
-            <span className="text-[0.72rem] text-ink-soft">
+            <span className="text-[0.72rem] text-muted-foreground">
               +{remaining.length - 3} more in Evidence
             </span>
           )}
@@ -1202,9 +1210,9 @@ const ImprovementRow = ({
   linkFor: (messageId: string) => GroundingHref
 }) => (
   <li>
-    <details className="group border border-rule bg-panel">
-      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-3 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0 text-lead font-semibold leading-snug">
+    <details className="group border border bg-card">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-3 text-left hover:bg-card-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 text-foreground font-semibold leading-snug">
           {displayReviewText(item.title)}
         </span>
         <span
@@ -1212,48 +1220,48 @@ const ImprovementRow = ({
         >
           {IMPROVEMENT_STATUS_LABEL[item.status]}
         </span>
-        <span className="ml-auto shrink-0 text-[0.72rem] text-custody group-open:text-ink-soft">
+        <span className="ml-auto shrink-0 text-[0.72rem] text-foreground group-open:text-muted-foreground">
           Details <span aria-hidden="true">⌄</span>
         </span>
       </summary>
-      <div className="border-t border-rule bg-panel-2 p-3 text-[0.82rem] sm:p-4">
+      <div className="border-t border bg-card-2 p-3 text-[0.82rem] sm:p-4">
         <dl className="grid gap-2 md:grid-cols-2">
-          <div className="border border-rule bg-panel px-3 py-2.5">
-            <dt className="font-semibold text-ink">Problem</dt>
-            <dd className="mt-1 leading-relaxed text-ink-soft">
+          <div className="border border bg-card px-3 py-2.5">
+            <dt className="font-semibold text-foreground">Problem</dt>
+            <dd className="mt-1 leading-relaxed text-muted-foreground">
               {displayReviewText(item.sessionTrigger)}
             </dd>
           </div>
-          <div className="border border-custody/50 bg-custody/5 px-3 py-2.5">
-            <dt className="font-semibold text-custody">What the code revealed</dt>
-            <dd className="mt-1 leading-relaxed text-ink">
+          <div className="border border-card/50 bg-card/5 px-3 py-2.5">
+            <dt className="font-semibold text-foreground">What the code revealed</dt>
+            <dd className="mt-1 leading-relaxed text-foreground">
               <CodeInsight item={item} />
             </dd>
           </div>
-          <div className="border border-rule bg-panel px-3 py-2.5">
-            <dt className="font-semibold text-ink">Recommended change</dt>
-            <dd className="mt-1 leading-relaxed text-ink-soft">
+          <div className="border border bg-card px-3 py-2.5">
+            <dt className="font-semibold text-foreground">Recommended change</dt>
+            <dd className="mt-1 leading-relaxed text-muted-foreground">
               {displayReviewText(item.proposedChange)}
             </dd>
           </div>
-          <div className="border border-rule bg-panel px-3 py-2.5">
-            <dt className="font-semibold text-ink">Future impact</dt>
-            <dd className="mt-1 leading-relaxed text-ink-soft">
+          <div className="border border bg-card px-3 py-2.5">
+            <dt className="font-semibold text-foreground">Future impact</dt>
+            <dd className="mt-1 leading-relaxed text-muted-foreground">
               {displayReviewText(item.futureReuse)}
             </dd>
           </div>
         </dl>
-        <details className="mt-3 border border-rule bg-panel px-3 py-2.5">
-          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 font-semibold text-ink-soft hover:text-ink [&::-webkit-details-marker]:hidden">
+        <details className="mt-3 border border bg-card px-3 py-2.5">
+          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 font-semibold text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
             Evidence
             <span className="font-mono text-[0.72rem] font-normal">
               {item.sessionEvidence.length} session refs · {item.codeEvidence.length} code refs
             </span>
-            <span className="ml-auto text-custody" aria-hidden="true">
+            <span className="ml-auto text-foreground" aria-hidden="true">
               ⌄
             </span>
           </summary>
-          <ul className="mt-3 space-y-2 border-t border-rule pt-3 text-ink-soft">
+          <ul className="mt-3 space-y-2 border-t border pt-3 text-muted-foreground">
             {item.sessionEvidence.map((evidence) => {
               const href = linkFor(evidence.messageId)
               const label = displayReviewText(evidence.what) || "View conversation evidence"
@@ -1264,7 +1272,7 @@ const ImprovementRow = ({
                       {label}
                     </Link>
                   ) : (
-                    <span className="text-ink-soft">{label}</span>
+                    <span className="text-muted-foreground">{label}</span>
                   )}
                 </li>
               )
@@ -1274,7 +1282,7 @@ const ImprovementRow = ({
                 key={`${citation.repo}:${citation.path}:${citation.revision}`}
                 className="break-all"
               >
-                <span className="font-mono text-ink">
+                <span className="font-mono text-foreground">
                   {citation.path}
                   {citation.fromLine === undefined
                     ? ""
@@ -1287,7 +1295,7 @@ const ImprovementRow = ({
             ))}
           </ul>
           {item.evidenceBasis === "session-only" ? (
-            <p className="mt-2 text-ink-soft">Repository status has not been verified.</p>
+            <p className="mt-2 text-muted-foreground">Repository status has not been verified.</p>
           ) : null}
         </details>
       </div>
@@ -1308,12 +1316,14 @@ const EvidenceCoverage = ({ evidence }: { evidence: NonNullable<AiReviewSignals[
     afterTree === undefined ? "Unavailable" : afterTree.available ? "Complete" : "Partial"
   return (
     <section aria-label="Repository evidence" className="mt-3">
-      <p className="mb-1.5 text-[0.72rem] font-semibold text-ink-soft">Repository evidence</p>
+      <p className="mb-1.5 text-[0.72rem] font-semibold text-muted-foreground">
+        Repository evidence
+      </p>
       <div className="grid gap-2 text-[0.78rem] sm:grid-cols-2">
-        <div className="border border-rule bg-panel-2 p-3">
+        <div className="border border bg-card-2 p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-1">
             <h4 className="font-semibold">Start tree</h4>
-            <span className="font-mono text-[0.7rem] text-ink-soft">
+            <span className="font-mono text-[0.7rem] text-muted-foreground">
               {evidence.tree.available
                 ? "Complete"
                 : evidence.tree.source === "none"
@@ -1321,28 +1331,30 @@ const EvidenceCoverage = ({ evidence }: { evidence: NonNullable<AiReviewSignals[
                   : "Partial"}
             </span>
           </div>
-          <p className="mt-1 text-ink-soft">
+          <p className="mt-1 text-muted-foreground">
             {evidence.startCommit === null
               ? "Start commit unavailable"
               : `Start commit ${evidence.startCommit.slice(0, 12)}`}
           </p>
-          <p className="mt-1 text-ink-soft">
+          <p className="mt-1 text-muted-foreground">
             {evidence.states?.start
               ? `Session start captured · ${evidence.states.start.files.length} changed entries`
               : "No session-start capture; reconstructed from the commit"}
           </p>
           {evidence.tree.files === undefined ? null : (
-            <p className="mt-1 text-ink-soft">{evidence.tree.files.length} files available</p>
+            <p className="mt-1 text-muted-foreground">
+              {evidence.tree.files.length} files available
+            </p>
           )}
         </div>
-        <div className="border border-rule bg-panel-2 p-3">
+        <div className="border border bg-card-2 p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-1">
             <h4 className="font-semibold">After tree</h4>
-            <span className="font-mono text-[0.7rem] text-ink-soft">{afterStatus}</span>
+            <span className="font-mono text-[0.7rem] text-muted-foreground">{afterStatus}</span>
           </div>
           {afterState === undefined ? (
             <>
-              <p className="mt-1 text-ink-soft">
+              <p className="mt-1 text-muted-foreground">
                 {afterTree !== undefined
                   ? "After tree staged; capture details are unavailable in this review."
                   : afterSource === "none"
@@ -1350,31 +1362,37 @@ const EvidenceCoverage = ({ evidence }: { evidence: NonNullable<AiReviewSignals[
                     : "The after capture is unavailable in this review."}
               </p>
               {afterTree?.files === undefined ? null : (
-                <p className="mt-1 text-ink-soft">{afterTree.files.length} files available</p>
+                <p className="mt-1 text-muted-foreground">
+                  {afterTree.files.length} files available
+                </p>
               )}
             </>
           ) : (
             <>
-              <p className="mt-1 text-ink-soft">
+              <p className="mt-1 text-muted-foreground">
                 {afterSource === "session-end" ? "Session end" : "Review time"} captured
                 {` · ${afterState.files.length} changed entries`}
               </p>
-              <p className="mt-1 text-ink-soft">
+              <p className="mt-1 text-muted-foreground">
                 {afterState.headSha
                   ? `After commit ${afterState.headSha.slice(0, 12)}`
                   : "After commit unavailable"}
               </p>
               {afterTree === undefined ? (
-                <p className="mt-1 text-ink-soft">The captured after tree could not be staged.</p>
+                <p className="mt-1 text-muted-foreground">
+                  The captured after tree could not be staged.
+                </p>
               ) : afterTree.files === undefined ? null : (
-                <p className="mt-1 text-ink-soft">{afterTree.files.length} files available</p>
+                <p className="mt-1 text-muted-foreground">
+                  {afterTree.files.length} files available
+                </p>
               )}
             </>
           )}
         </div>
       </div>
       {evidence.omissions.length === 0 ? null : (
-        <p className="mt-1.5 text-[0.72rem] text-ink-soft">
+        <p className="mt-1.5 text-[0.72rem] text-muted-foreground">
           {evidence.omissions.length} evidence items omitted across the review.
         </p>
       )}
@@ -1427,23 +1445,26 @@ const ReviewerSessionModal = ({
         open
         aria-modal="true"
         aria-labelledby="reviewer-session-title"
-        className="relative w-full max-w-2xl border border-rule bg-panel-2 p-6 text-ink shadow-overlay"
+        className="relative w-full max-w-2xl border border bg-card-2 p-6 text-foreground shadow-overlay"
       >
         <div className="flex items-baseline justify-between gap-3">
-          <h2 id="reviewer-session-title" className="text-case-title font-semibold leading-tight">
+          <h2
+            id="reviewer-session-title"
+            className="text-lg font-semibold font-semibold leading-tight"
+          >
             Reviewer session
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-[0.78rem] font-semibold text-ink-soft underline"
+            className="text-[0.78rem] font-semibold text-muted-foreground underline"
           >
             Close
           </button>
         </div>
         <div className="mt-4 max-h-[60vh] overflow-y-auto">
           {transcript.length === 0 ? (
-            <pre className="whitespace-pre-wrap rounded-xs border border-rule bg-paper p-2 font-mono text-[0.72rem] leading-5 text-ink-soft">
+            <pre className="whitespace-pre-wrap rounded-xs border border bg-background p-2 font-mono text-[0.72rem] leading-5 text-muted-foreground">
               {tail}
             </pre>
           ) : (
@@ -1454,10 +1475,12 @@ const ReviewerSessionModal = ({
                   data-actor={entry.role}
                   className="py-2"
                 >
-                  <p className="font-mono text-[0.656rem] font-semibold uppercase tracking-[0.1em] text-custody">
+                  <p className="font-mono text-[0.656rem] font-semibold uppercase tracking-[0.1em] text-foreground">
                     {ROLE_LABEL[entry.role]}
                     {entry.at === undefined ? null : (
-                      <span className="ml-2 font-normal text-faded">{absoluteTime(entry.at)}</span>
+                      <span className="ml-2 font-normal text-muted-foreground">
+                        {absoluteTime(entry.at)}
+                      </span>
                     )}
                   </p>
                   {entry.text === undefined ? null : (
@@ -1470,7 +1493,7 @@ const ReviewerSessionModal = ({
                     : entry.tools.map((tool) => (
                         <p
                           key={`${tool.name}:${tool.input}`}
-                          className="mt-1 truncate font-mono text-[0.72rem] text-ink-soft"
+                          className="mt-1 truncate font-mono text-[0.72rem] text-muted-foreground"
                           title={`${tool.name}: ${tool.input}`}
                         >
                           <span className="font-semibold">{tool.name}</span> {tool.input}
@@ -1545,12 +1568,12 @@ const AiReviewCard = ({
   const [logOpen, setLogOpen] = useState(false)
 
   return (
-    <Card className="bg-panel p-4">
+    <Card className="bg-card p-4">
       <CardHeader className="flex-row flex-wrap items-center gap-2 p-0">
         <Badge variant="outline" className="font-mono">
           {review.analyzer === "ai-v2" ? "Code-aware AI review" : "AI review"}
         </Badge>
-        <span className="text-evidence text-faded">
+        <span className="text-muted-foreground text-muted-foreground">
           Analyzed {absoluteTime(review.analyzedAt ?? review.createdAt)}
         </span>
         <Button
@@ -1568,40 +1591,40 @@ const AiReviewCard = ({
       <CardContent className="p-0 pt-2">
         <Verdict outcome={review.outcome} friction={review.friction} />
         {signals === null ? null : (
-          <p className="mt-1.5 font-mono text-[0.72rem] text-ink-soft">
+          <p className="mt-1.5 font-mono text-[0.72rem] text-muted-foreground">
             {signals.model} · {signals.harness}
           </p>
         )}
         {/* A redo's state would otherwise be invisible: the analyze section only renders when
          * no review exists, so every redo phase has to surface here, on the card itself. */}
         {analysis.phase === "running" ? (
-          <p className="mt-1.5 font-mono text-[0.72rem] text-ink-soft">
+          <p className="mt-1.5 font-mono text-[0.72rem] text-muted-foreground">
             Redo running… (started {absoluteTime(analysis.startedAt)})
           </p>
         ) : null}
         {analysis.phase === "failed" ? (
-          <p role="alert" className="mt-1.5 text-[0.82rem] text-err">
+          <p role="alert" className="mt-1.5 text-[0.82rem] text-destructive">
             Redo failed — {analysis.message} You can try again.
           </p>
         ) : null}
         {analysis.phase === "forbidden" ? (
-          <p className="mt-1.5 text-[0.82rem] text-ink-soft">
+          <p className="mt-1.5 text-[0.82rem] text-muted-foreground">
             You need edit rights on this project to run an AI review.
           </p>
         ) : null}
         {analysis.phase === "congested" ? (
-          <p className="mt-1.5 text-[0.82rem] text-ink-soft">
+          <p className="mt-1.5 text-[0.82rem] text-muted-foreground">
             The server is running 4 analyses already — try again in a minute.
           </p>
         ) : null}
-        <p className="mt-2 text-ink">{displayReviewText(review.summary)}</p>
+        <p className="mt-2 text-foreground">{displayReviewText(review.summary)}</p>
         {numbers === undefined ? null : <NumbersLine numbers={numbers} />}
         {signals?.partial === undefined ? null : (
           <PartialBanner partial={signals.partial} recovered={signals.run?.recovered ?? []} />
         )}
 
         {entries.length === 0 ? (
-          <p className="text-ink-soft">
+          <p className="text-muted-foreground">
             {analysis.phase === "failed"
               ? `Review failed — ${analysis.message}`
               : "No timeline entries in this review"}
@@ -1610,20 +1633,20 @@ const AiReviewCard = ({
           <>
             <TimeStrip entries={entries} totalMs={totalMs} failedSeqs={failedSeqs} />
             {review.analyzer === "ai-v2" ? (
-              <details className="group mt-4 border border-rule bg-panel-2">
-                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-semibold hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
+              <details className="group mt-4 border border bg-card-2">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-semibold hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
                   Session timeline
-                  <span className="font-mono text-[0.72rem] font-normal text-ink-soft">
+                  <span className="font-mono text-[0.72rem] font-normal text-muted-foreground">
                     {visibleTimelineEntries(entries).length} steps
                   </span>
                   <span
                     aria-hidden="true"
-                    className="ml-auto text-ink-soft transition-transform group-open:rotate-180"
+                    className="ml-auto text-muted-foreground transition-transform group-open:rotate-180"
                   >
                     ⌄
                   </span>
                 </summary>
-                <div className="border-t border-rule px-3 pb-3">
+                <div className="border-t border px-3 pb-3">
                   <TimelineSection
                     entries={entries}
                     linkFor={linkFor}
@@ -1668,12 +1691,12 @@ const AiReviewCard = ({
           <section className="mt-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-[1rem] font-semibold">Improvements for future sessions</h3>
-              <span className="text-evidence text-ink-soft">
+              <span className="text-muted-foreground text-muted-foreground">
                 {improvements.length} {improvements.length === 1 ? "finding" : "findings"}
               </span>
             </div>
             {improvements.length === 0 ? (
-              <p className="mt-2 text-[0.82rem] text-ink-soft">
+              <p className="mt-2 text-[0.82rem] text-muted-foreground">
                 No reusable improvements were supported by this session’s evidence.
               </p>
             ) : (
@@ -1760,7 +1783,7 @@ const AnalyzeSection = ({
   const buttonRef = useRef<HTMLButtonElement>(null)
   const running = analysis.phase === "running"
   return (
-    <section className="border border-dashed border-rule bg-panel p-4">
+    <section className="border border-dashed border bg-card p-4">
       <div className="flex flex-wrap items-center gap-3">
         <Button
           ref={buttonRef}
@@ -1773,22 +1796,22 @@ const AnalyzeSection = ({
           Analyze with AI
         </Button>
         {analysis.phase === "running" ? (
-          <span className="text-evidence text-ink-soft">
+          <span className="text-muted-foreground text-muted-foreground">
             Analyzing… (started {absoluteTime(analysis.startedAt)})
           </span>
         ) : null}
         {analysis.phase === "forbidden" ? (
-          <span className="text-[0.82rem] text-ink-soft">
+          <span className="text-[0.82rem] text-muted-foreground">
             You need edit rights on this project to run an AI review.
           </span>
         ) : null}
         {analysis.phase === "congested" ? (
-          <span className="text-[0.82rem] text-ink-soft">
+          <span className="text-[0.82rem] text-muted-foreground">
             The server is running 4 analyses already — try again in a minute.
           </span>
         ) : null}
         {analysis.phase === "failed" ? (
-          <span className="text-[0.82rem] text-ink-soft" role="alert">
+          <span className="text-[0.82rem] text-muted-foreground" role="alert">
             Analysis failed — {analysis.message} You can try again.
           </span>
         ) : null}
@@ -1809,12 +1832,12 @@ const AnalyzeSection = ({
 // The same word treatment the Lessons page uses, so a status reads identically in both places.
 const statusWord = (status: string): { readonly label: string; readonly className: string } =>
   status === "accepted"
-    ? { label: "Accepted", className: "font-semibold text-ok" }
+    ? { label: "Accepted", className: "font-semibold text-emerald-600" }
     : status === "superseded"
-      ? { label: "Retired", className: "text-faded line-through" }
+      ? { label: "Retired", className: "text-muted-foreground line-through" }
       : status === "candidate"
-        ? { label: "Candidate", className: "font-semibold text-stamp" }
-        : { label: status, className: "text-ink-soft" }
+        ? { label: "Candidate", className: "font-semibold text-amber-600" }
+        : { label: status, className: "text-muted-foreground" }
 
 const StatusWord = ({ status }: { status: string }) => {
   const { label, className } = statusWord(status)
@@ -1822,15 +1845,15 @@ const StatusWord = ({ status }: { status: string }) => {
 }
 
 const LessonRow = ({ row }: { row: SessionLearning }) => (
-  <li className="border border-rule bg-panel p-3">
+  <li className="border border bg-card p-3">
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <p className="text-lead font-semibold leading-snug">{row.title}</p>
-      <p className="text-evidence text-ink-soft">
+      <p className="text-foreground font-semibold leading-snug">{row.title}</p>
+      <p className="text-muted-foreground text-muted-foreground">
         <StatusWord status={row.status} />
         {` · seen ${row.occurrenceCount} ${row.occurrenceCount === 1 ? "time" : "times"}`}
       </p>
     </div>
-    <p className="mt-1 font-mono text-[0.72rem] text-ink-soft">
+    <p className="mt-1 font-mono text-[0.72rem] text-muted-foreground">
       {LESSON_AUDIENCE_LABEL[row.audience] ?? row.audience} · {row.category}
     </p>
   </li>
@@ -2011,7 +2034,7 @@ const ReviewPanel = ({
   return (
     <div className="flex flex-col gap-4">
       {review.reviews.length === 0 ? (
-        <p className="text-ink-soft">This session has not been reviewed yet.</p>
+        <p className="text-muted-foreground">This session has not been reviewed yet.</p>
       ) : null}
       {standard === null && codeAware === null ? null : (
         <fieldset className="flex flex-wrap gap-2">
@@ -2062,9 +2085,11 @@ const ReviewPanel = ({
        * only renders for static-only sessions, where it is the one lessons surface. */}
       {ai !== null || review.reviews.length === 0 ? null : (
         <section>
-          <h2 className="mb-2 text-label font-semibold text-faded">Lessons from this session</h2>
+          <h2 className="mb-2 text-foreground font-semibold text-muted-foreground">
+            Lessons from this session
+          </h2>
           {review.learnings.length === 0 ? (
-            <p className="text-ink-soft">No lessons from this session.</p>
+            <p className="text-muted-foreground">No lessons from this session.</p>
           ) : (
             <ul className="flex flex-col gap-3">
               {review.learnings.map((row) => (
@@ -2289,8 +2314,8 @@ const Ready = ({
       <Masthead session={detail.session} tokens={detail.tokenUsage} />
 
       {/* Measured rather than a fixed offset: the head's height moves with the reader's font size. */}
-      <div ref={tabsRef} className="sticky z-20 mt-4 bg-paper" style={{ top: headHeight }}>
-        <div className="flex flex-wrap items-end justify-between gap-x-4 border-b border-rule">
+      <div ref={tabsRef} className="sticky z-20 mt-4 bg-background" style={{ top: headHeight }}>
+        <div className="flex flex-wrap items-end justify-between gap-x-4 border-b border">
           <Tabs
             tabs={tabsFor(detail, payload, artifactCount, inlineTools, reviewCount)}
             selected={tab}

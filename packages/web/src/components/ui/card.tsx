@@ -11,10 +11,7 @@ const Card = React.forwardRef<
 >(({ className, as: As = "article", ...props }, ref) => (
   <As
     ref={ref as React.Ref<never>}
-    className={cn(
-      "rounded-sm border border-rule bg-card text-card-foreground shadow-card",
-      className,
-    )}
+    className={cn("rounded-sm border bg-card text-card-foreground shadow-card", className)}
     {...props}
   />
 ))

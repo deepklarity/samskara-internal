@@ -20,21 +20,24 @@ type State =
 
 const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="min-w-0">
-    <p className="text-label font-semibold text-ink-soft">{label}</p>
+    <p className="text-muted-foreground font-semibold">{label}</p>
     <p className="truncate font-mono text-[0.9375rem]">{children}</p>
   </div>
 )
 
 const ErrorState = ({ error }: { error: ApiError }) => (
-  <section className="border border-err/40 bg-panel p-6">
-    <p className="text-label font-semibold text-err">Retrieval failed</p>
-    <p className="mt-2 text-ink-soft">{error.message}</p>
+  <section className="border border-destructive/40 bg-card p-6">
+    <p className="text-muted-foreground font-semibold">Retrieval failed</p>
+    <p className="mt-2 text-muted-foreground">{error.message}</p>
   </section>
 )
 
 const OwnerValue = ({ owner }: { owner: ProjectDetailPayload["owner"] }) =>
   owner.type === "org" ? (
-    <Link to={`/orgs/${encodeURIComponent(owner.slug)}`} className="text-custody hover:underline">
+    <Link
+      to={`/orgs/${encodeURIComponent(owner.slug)}`}
+      className="text-muted-foreground hover:underline"
+    >
       org · {owner.slug}
     </Link>
   ) : (
@@ -98,7 +101,7 @@ export const ProjectDetail = () => {
   return (
     <section>
       <h1 className="text-case-title font-semibold leading-tight">{project.name}</h1>
-      <div className="mt-4 grid grid-cols-2 gap-4 border border-rule bg-panel-2 p-4 shadow-card min-[560px]:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-4 bg-card p-4 shadow-xs min-[560px]:grid-cols-4">
         <Field label="Slug">{project.slug}</Field>
         <Field label="Owner">
           <OwnerValue owner={project.owner} />
@@ -115,7 +118,7 @@ export const ProjectDetail = () => {
         {project.sessionCount > 0 ? (
           <Link
             to={`/sessions?project=${encodeURIComponent(project.id)}`}
-            className="text-[0.78rem] font-semibold text-custody hover:underline"
+            className="text-muted-foreground font-semibold hover:underline"
           >
             Filter &amp; search these sessions
           </Link>
@@ -123,9 +126,9 @@ export const ProjectDetail = () => {
       </div>
 
       {recent === null ? (
-        <p className="mt-2 text-ink-soft">Loading sessions…</p>
+        <p className="mt-2 text-muted-foreground">Loading sessions…</p>
       ) : recent.length === 0 ? (
-        <p className="mt-2 border border-rule-soft bg-panel p-4 text-ink-soft">
+        <p className="mt-2 border bg-card p-4 text-muted-foreground">
           Nothing captured here yet. Run{" "}
           <code className="font-mono text-[0.78rem]">samskara watch</code> in this project to start
           recording sessions.
@@ -147,7 +150,7 @@ export const ProjectDetail = () => {
             <button
               type="button"
               onClick={() => setShownCount((count) => count + 20)}
-              className="mt-3 w-full border border-rule bg-panel-2 px-4 py-2 text-[0.82rem] font-semibold text-ink-soft hover:border-ink-soft hover:text-ink"
+              className="mt-3 w-full bg-card px-4 py-2 text-sm font-semibold text-muted-foreground hover:border-muted-foreground hover:text-foreground"
             >
               Show more ({recent.length - shownCount} remaining)
             </button>
@@ -156,16 +159,16 @@ export const ProjectDetail = () => {
       )}
 
       {viewerCanDelete ? (
-        <div className="mt-8 border border-err/40 bg-panel p-4">
-          <h2 className="text-label font-semibold text-err">Delete this project</h2>
-          <p className="mt-1 text-ink-soft">
+        <div className="mt-8 border border-error/40 bg-card p-4">
+          <h2 className="text-muted-foreground font-semibold">Delete this project</h2>
+          <p className="mt-1 text-muted-foreground">
             Removes the project and every session captured in it. This cannot be undone.
           </p>
           <button
             ref={deleteTriggerRef}
             type="button"
             onClick={() => setDeleting(true)}
-            className="mt-3 min-h-11 border border-err/60 bg-panel-2 px-4 py-2 text-[0.78rem] font-semibold text-err"
+            className="mt-3 min-h-11 border border-destructive/60 bg-card px-4 py-2 text-sm font-semibold text-destructive"
           >
             Delete project
           </button>

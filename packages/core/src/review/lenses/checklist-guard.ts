@@ -56,7 +56,7 @@ export const validateToolFailureChecklist = (
  * 1. Citing per-tool counts from run numbers (mentions tool names with numbers)
  * 2. Being a "Nothing to change for the agent" entry with explicit tool-failure reason
  */
-const isToolFailureLearning = (learning: AgentLearning, toolFailures: number): boolean => {
+const isToolFailureLearning = (learning: AgentLearning, _toolFailures: number): boolean => {
   const title = learning.title.toLowerCase()
   const detail = learning.detail.toLowerCase()
   const combined = `${title} ${detail}`

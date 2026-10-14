@@ -28,9 +28,9 @@ const SPINE: readonly SpineRecord[] = [
 ]
 
 const NODE: Record<SpineActor, string> = {
-  user: "border-panel-2 bg-panel-2",
-  assistant: "border-custody-lift",
-  aside: "border-rule",
+  user: "border border-card",
+  assistant: "border border-muted/20",
+  aside: "border border-border",
 }
 
 /* The mark is the custody spine itself: the record a human filed, solid; the record the agent
@@ -57,36 +57,34 @@ const CustodySpine = () => (
         {index < SPINE.length - 1 ? (
           <span
             aria-hidden="true"
-            className="absolute left-[4px] top-[15px] block h-[calc(100%_+_1.5rem_-_15px)] w-[2px] bg-custody-lift/40"
+            className="absolute left-[4px] top-[15px] block h-[calc(100%_+_1.5rem_-_15px)] w-[2px] bg-muted/40"
           />
         ) : null}
         <span
           aria-hidden="true"
           className={`absolute left-0 top-[5px] block size-[10px] rounded-pill border-2 ${NODE[record.actor]}`}
         />
-        <p className="text-panel-2">{record.title}</p>
-        <p className="mt-1 font-mono text-[0.78rem] text-panel-2/60">{record.meta}</p>
+        <p className="text-foreground">{record.title}</p>
+        <p className="mt-1 font-mono text-[0.78rem] text-muted-foreground">{record.meta}</p>
       </li>
     ))}
   </ol>
 )
 
 const EvidencePanel = () => (
-  <section className="animate-file-in flex flex-col justify-center bg-ink px-6 py-14 sm:px-10 lg:px-14 lg:py-16">
+  <section className="animate-file-in flex flex-col justify-center bg-background px-6 py-14 sm:px-10 lg:px-14 lg:py-16">
     <div className="mx-auto w-full max-w-[28rem]">
-      <h1 className="flex items-center gap-3 text-case-title text-panel-2">
+      <h1 className="flex items-center gap-3 text-foreground font-semibold">
         <SamskaraMark />
         samskara
       </h1>
 
-      <h2 className="mt-9 text-cover text-panel-2">
-        Read why a change happened, not just what changed.
-      </h2>
-      <p className="mt-5 text-lead text-panel-2/70">
+      <h2 className="mt-9 text-foreground">Read why a change happened, not just what changed.</h2>
+      <p className="mt-5 text-foreground">
         Samskara files the intent, the agent session, the tool activity and the artifacts behind
         AI-assisted code. Review starts with the reasoning, not the diff.
       </p>
-      <p className="mt-12 text-label uppercase text-panel-2/50">How a session is filed</p>
+      <p className="mt-12 text-muted-foreground uppercase">How a session is filed</p>
       <CustodySpine />
     </div>
   </section>
@@ -98,17 +96,17 @@ const AccessColumn = ({ onLocalSignedIn }: Props) => {
   return (
     <section className="relative flex flex-col justify-center px-6 py-14 sm:px-10 lg:px-14">
       <div aria-hidden="true" className="ledger-ground pointer-events-none absolute inset-0" />
-      <Card className="animate-file-in relative mx-auto w-full max-w-[23rem] bg-panel-2 p-8">
+      <Card className="animate-file-in relative mx-auto w-full max-w-[23rem] bg-card p-6">
         <h2 className="text-case-title">Sign in</h2>
-        <div aria-hidden="true" className="mt-4 h-[2px] w-10 bg-stamp" />
-        <p className="mt-5 text-lead text-ink-soft">
+        <div aria-hidden="true" className="mt-4 h-[2px] w-10 bg-muted" />
+        <p className="mt-5 text-foreground">
           Open your filed sessions — every prompt, tool call and artifact, kept in place.
         </p>
 
         {methods.github ? (
           <a
             href="/api/auth/github/start"
-            className="mt-8 inline-flex w-full items-center justify-center gap-2.5 rounded-xs border border-ink bg-ink px-4 py-3 font-semibold text-panel-2 transition-colors hover:bg-ink-2"
+            className="mt-8 inline-flex w-full items-center justify-center gap-2.5 rounded-lg border border-primary px-4 py-3 font-semibold bg-primary text-primary-foreground hover:bg-primary/25 transition-colors"
           >
             <GithubMark />
             Continue with GitHub

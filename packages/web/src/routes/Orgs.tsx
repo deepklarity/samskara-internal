@@ -21,10 +21,10 @@ type FormState =
 const IDLE_FORM: FormState = { phase: "idle" }
 
 const ErrorState = ({ error }: { error: ApiError }) => (
-  <Card className="border-err/40 bg-panel">
+  <Card className="border border-destructive/40 bg-card">
     <CardContent className="p-6">
-      <p className="text-label font-semibold text-err">Retrieval failed</p>
-      <p className="mt-2 text-ink-soft">{error.message}</p>
+      <p className="text-muted-foreground font-semibold">Retrieval failed</p>
+      <p className="mt-2 text-muted-foreground">{error.message}</p>
     </CardContent>
   </Card>
 )
@@ -97,21 +97,21 @@ export const Orgs = () => {
           <li key={org.id}>
             <Link
               to={`/orgs/${encodeURIComponent(org.githubSlug)}`}
-              className="flex w-full flex-col gap-2 bg-panel-2 p-4 text-left transition-colors hover:border-ink-soft"
+              className="flex w-full flex-col gap-2 bg-card p-4 text-left hover:border-muted-foreground"
             >
-              <h2 className="truncate text-lead font-semibold">{org.name}</h2>
-              <p className="truncate font-mono text-[0.78rem] text-custody">{org.githubSlug}</p>
+              <h2 className="truncate text-foreground font-semibold">{org.name}</h2>
+              <p className="truncate font-mono text-sm text-muted-foreground">{org.githubSlug}</p>
             </Link>
           </li>
         ))}
       </ul>
 
       {user?.isSuperAdmin ? (
-        <form onSubmit={register} className="mt-6 max-w-sm bg-panel-2 p-4">
-          <h2 className="text-lead font-semibold">Register an org</h2>
+        <form onSubmit={register} className="mt-6 max-w-sm bg-card p-4">
+          <h2 className="text-foreground font-semibold">Register an org</h2>
           <label
             htmlFor="org-slug-input"
-            className="mt-3 block text-label font-semibold text-ink-soft"
+            className="mt-3 block text-muted-foreground font-semibold"
           >
             GitHub org slug
           </label>
@@ -122,7 +122,7 @@ export const Orgs = () => {
             disabled={form.phase === "submitting"}
             onChange={(event) => setSlug(event.target.value)}
             autoComplete="off"
-            className="mt-1 w-full border border-rule bg-panel px-3 py-2 font-mono text-[0.9375rem]"
+            className="mt-1 w-full border bg-card px-3 py-2 font-mono text-sm"
           />
           <label className="mt-3 flex items-center gap-2">
             <input
@@ -141,7 +141,7 @@ export const Orgs = () => {
             {form.phase === "submitting" ? "Registering…" : "Register"}
           </Button>
           {form.phase === "failed" ? (
-            <p role="alert" className="mt-3 border border-err/40 bg-panel p-3 text-err">
+            <p role="alert" className="mt-3 border border-error/40 bg-card p-3 text-error">
               {form.error}
             </p>
           ) : null}

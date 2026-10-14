@@ -101,34 +101,42 @@ export const AnalyzeDialog = ({
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-start justify-center bg-ink/30 p-4 pt-16">
+    <div className="fixed inset-0 z-30 flex items-start justify-center bg-primary/30 p-4 pt-16">
       <dialog
         ref={dialogRef}
         open
         aria-modal="true"
         aria-labelledby="analyze-dialog-title"
-        className="relative w-full max-w-md border border-rule bg-panel-2 p-6 text-ink shadow-overlay"
+        className="relative w-full max-w-md border border bg-card p-6 text-foreground shadow-overlay"
       >
-        <h2 id="analyze-dialog-title" className="text-case-title font-semibold leading-tight">
+        <h2 id="analyze-dialog-title" className="text-lg font-semibold font-semibold leading-tight">
           Analyze with AI
         </h2>
-        <p className="mt-2 text-ink-soft">
+        <p className="mt-2 text-muted-foreground">
           Choose which reviewer runs the analysis. The server's defaults are preselected.
         </p>
 
         {state.phase === "loading" ? (
-          <p className="mt-4 font-mono text-[0.72rem] text-ink-soft">Loading reviewer options…</p>
+          <p className="mt-4 font-mono text-[0.72rem] text-muted-foreground">
+            Loading reviewer options…
+          </p>
         ) : null}
 
         {state.phase === "failed" ? (
-          <p role="alert" className="mt-4 border border-err/40 bg-panel p-3 text-err">
+          <p
+            role="alert"
+            className="mt-4 border border-destructive/40 bg-card p-3 text-destructive"
+          >
             {state.error.message}
           </p>
         ) : null}
 
         {ready !== null ? (
           usableHarnesses.length === 0 ? (
-            <p role="alert" className="mt-4 border border-err/40 bg-panel p-3 text-err">
+            <p
+              role="alert"
+              className="mt-4 border border-destructive/40 bg-card p-3 text-destructive"
+            >
               {analyzer === "ai-v2"
                 ? "Code-aware review requires opencode on the server."
                 : "No reviewer CLI is installed on the server (opencode or claude)."}
@@ -239,14 +247,14 @@ export const AnalyzeDialog = ({
             type="button"
             onClick={run}
             disabled={ready === null || usableHarnesses.length === 0}
-            className="border border-ink bg-ink px-3 py-2 text-[0.78rem] font-semibold text-panel-2 transition-colors hover:bg-ink-2 disabled:opacity-60"
+            className="border border-primary bg-primary px-3 py-2 text-[0.78rem] font-semibold text-muted-foreground transition-colors hover:bg-primary-2 disabled:opacity-60"
           >
             Run analysis
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="text-[0.78rem] font-semibold text-ink-soft underline"
+            className="text-[0.78rem] font-semibold text-muted-foreground underline"
           >
             Cancel
           </button>

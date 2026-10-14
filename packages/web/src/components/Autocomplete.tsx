@@ -1,13 +1,11 @@
 import { useCombobox } from "downshift"
+import { ChevronDown } from "lucide-react"
 import { useId } from "react"
-import { Caret, ComboboxMenu, suggestionsFor } from "./combobox.js"
+import { ComboboxMenu, suggestionsFor } from "./combobox.js"
 import { controlClass, labelClass } from "./TextField.js"
+import { Input } from "./ui/input.js"
+import { Label } from "./ui/label.js"
 
-/**
- * The filter reads as free text and as a picker at once: the reader may type any fragment, and the
- * menu offers only the values actually present on the page, so a filter that matches nothing is
- * something they chose rather than something they mistyped.
- */
 type Props = {
   readonly label: string
   readonly value: string
@@ -37,22 +35,22 @@ export const Autocomplete = ({ label, value, options, onChange, placeholder }: P
 
   return (
     <div className="min-w-0">
-      <label {...getLabelProps()} htmlFor={inputId} className={labelClass}>
+      <Label {...getLabelProps()} htmlFor={inputId} className={labelClass}>
         {label}
-      </label>
+      </Label>
       <div className="relative mt-1">
-        <input
+        <Input
           className={`${controlClass} mt-0 pr-7`}
           placeholder={placeholder}
-          {...getInputProps()}
+          {...getInputProps({ id: inputId })}
         />
         <button
           type="button"
           aria-label={`Show ${label} suggestions`}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-soft hover:text-ink"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           {...getToggleButtonProps()}
         >
-          <Caret />
+          <ChevronDown className="size-3.5" />
         </button>
         <ComboboxMenu
           open={isOpen}

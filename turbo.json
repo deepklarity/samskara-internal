@@ -42,5 +42,6 @@
       "dependsOn": ["^build"],
       "cache": false
     }
-  }
+  },
+  "globalPassThroughEnv": ["API_BASE", "WEB_BASE"]
 }

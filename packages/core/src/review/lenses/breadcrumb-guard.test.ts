@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { type BreadcrumbValidationResult, validateBreadcrumb } from "./breadcrumb-guard.js"
+import { validateBreadcrumb } from "./breadcrumb-guard.js"
 
 describe("validateBreadcrumb", () => {
   test("passes a breadcrumb that survives the strip test (no session-specific names)", () => {

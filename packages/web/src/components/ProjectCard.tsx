@@ -6,8 +6,8 @@ import { Card } from "./ui/card.js"
 
 const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="min-w-0">
-    <p className="text-label font-semibold text-ink-soft">{label}</p>
-    <p className="truncate font-mono text-[0.78rem] tabular-nums">{children}</p>
+    <p className="text-muted-foreground font-semibold">{label}</p>
+    <p className="truncate font-mono text-sm tabular-nums">{children}</p>
   </div>
 )
 
@@ -21,19 +21,22 @@ export const ProjectCard = ({ project, to }: Props) => {
   const dormant = sessionCount === 0
 
   return (
-    <Card className="flex w-full flex-col gap-3 bg-panel-2 p-4 text-left transition-colors focus-within:border-ink-soft hover:border-ink-soft">
+    <Card
+      className="flex w-full flex-col gap-3 bg-card p-4 text-left focus-within:border-muted-foreground hover:border-muted-foreground"
+      role="article"
+    >
       <div className="min-w-0">
-        <h2 className="truncate text-lead font-semibold">
+        <h2 className="truncate text-foreground font-semibold">
           <Link to={to} className="hover:underline">
             {name}
           </Link>
         </h2>
-        <p className="truncate font-mono text-[0.78rem] text-custody">/{slug}</p>
-        <p className="truncate text-label font-semibold text-ink-soft">
+        <p className="truncate font-mono text-sm text-muted-foreground">/{slug}</p>
+        <p className="truncate text-muted-foreground font-semibold">
           {owner.type === "org" ? (
             <Link
               to={`/orgs/${encodeURIComponent(owner.slug)}`}
-              className="text-custody hover:underline"
+              className="text-muted-foreground hover:underline"
             >
               org · {owner.slug}
             </Link>
@@ -55,13 +58,13 @@ export const ProjectCard = ({ project, to }: Props) => {
       </div>
 
       {dormant ? (
-        <output className="block border-t border-rule-soft pt-2 text-label font-semibold text-ink-soft">
+        <output className="block border-t border pt-2 text-muted-foreground font-semibold">
           No sessions captured yet
         </output>
       ) : (
         <Link
           to={`/sessions?project=${encodeURIComponent(id)}`}
-          className="block border-t border-rule-soft pt-2 text-[0.78rem] font-semibold text-custody hover:underline"
+          className="block border-t border pt-2 text-sm font-semibold text-muted-foreground hover:underline"
         >
           View {sessionCount} sessions
         </Link>

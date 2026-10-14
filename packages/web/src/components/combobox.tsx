@@ -3,7 +3,7 @@ import type { FilterOption } from "../api/types.js"
 
 /** The chrome the free-text `Autocomplete` and the value-picking `Picker` share. */
 export const menuClass =
-  "absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xs border border-rule bg-panel-2 py-1 shadow-lg"
+  "absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-card py-1 shadow-md"
 
 export const itemClass = "cursor-pointer px-2 py-1 font-mono text-[0.78rem]"
 
@@ -68,7 +68,7 @@ export const ComboboxMenu = <T,>({
         ? items.map((item, index) => (
             <li
               key={keyOf(item)}
-              className={`${itemClass} ${highlightedIndex === index ? "bg-ink text-panel-2" : ""}`}
+              className={`${itemClass} ${highlightedIndex === index ? "bg-primary text-foreground" : ""}`}
               {...getItemProps({ item, index })}
             >
               {labelOf(item)}

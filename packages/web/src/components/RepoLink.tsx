@@ -6,7 +6,12 @@ export const RepoLink = ({ repo }: { repo: SessionRepo }) => {
   const label = repoLabel(repo)
   if (url === null) return <span>{label}</span>
   return (
-    <a href={url} target="_blank" rel="noreferrer" className="text-custody hover:underline">
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="text-muted-foreground hover:underline"
+    >
       {label}
     </a>
   )

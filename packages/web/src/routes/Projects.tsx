@@ -14,24 +14,24 @@ type State =
   | { readonly phase: "failed"; readonly error: ApiError }
 
 const EmptyState = () => (
-  <Card className="border-dashed bg-panel">
+  <Card className="border-dashed bg-card">
     <CardContent className="p-8 text-center">
-      <p className="text-label font-semibold text-stamp">No case files yet</p>
-      <h2 className="mt-2 text-lead font-semibold">Nothing has been filed here</h2>
-      <p className="mx-auto mt-2 max-w-md text-ink-soft">
+      <p className="text-muted-foreground font-semibold">No case files yet</p>
+      <h2 className="mt-2 text-foreground font-semibold">Nothing has been filed here</h2>
+      <p className="mx-auto mt-2 max-w-md text-muted-foreground">
         Send your first capture from the CLI and this shelf fills itself. Run{" "}
-        <code className="font-mono text-[0.78rem] text-custody">samskara capture</code> inside a
-        project to file its sessions.
+        <code className="font-mono text-[0.78rem]">samskara capture</code> inside a project to file
+        its sessions.
       </p>
     </CardContent>
   </Card>
 )
 
 const ErrorState = ({ error }: { error: ApiError }) => (
-  <Card className="border-err/40 bg-panel">
+  <Card className="border border-destructive/40 bg-card">
     <CardContent className="p-6">
-      <p className="text-label font-semibold text-err">Retrieval failed</p>
-      <p className="mt-2 text-ink-soft">{error.message}</p>
+      <p className="text-label font-semibold text-muted-foreground">Retrieval failed</p>
+      <p className="mt-2 text-muted-foreground">{error.message}</p>
     </CardContent>
   </Card>
 )

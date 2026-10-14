@@ -67,13 +67,13 @@ export const DeleteProjectDialog = ({ open, project, onClose, restoreFocusTo }: 
   const sessionWord = project.sessionCount === 1 ? "session" : "sessions"
 
   return (
-    <div className="fixed inset-0 z-30 flex items-start justify-center bg-ink/30 p-4 pt-16">
+    <div className="fixed inset-0 z-30 flex items-start justify-center bg-card/30 p-4 pt-16">
       <dialog
         ref={dialogRef}
         open
         aria-modal="true"
         aria-labelledby="delete-project-dialog-title"
-        className="relative w-full max-w-md border border-rule bg-panel-2 p-6 text-ink shadow-overlay"
+        className="relative w-full max-w-md border bg-card p-6 text-foreground shadow-lg"
       >
         <h2
           id="delete-project-dialog-title"
@@ -81,11 +81,11 @@ export const DeleteProjectDialog = ({ open, project, onClose, restoreFocusTo }: 
         >
           Delete project
         </h2>
-        <p className="mt-2 text-ink-soft">
+        <p className="mt-2 text-muted-foreground">
           This destroys {project.sessionCount} {sessionWord} along with the project. This cannot be
           undone.
         </p>
-        <p className="mt-4 text-ink-soft">
+        <p className="mt-4 text-muted-foreground">
           Type <code className="font-mono text-[0.78rem] text-custody">{project.slug}</code> to
           confirm.
         </p>
@@ -96,20 +96,23 @@ export const DeleteProjectDialog = ({ open, project, onClose, restoreFocusTo }: 
           onChange={(event) => setTyped(event.target.value)}
           aria-label="Project slug"
           autoComplete="off"
-          className="mt-2 w-full border border-rule bg-panel px-3 py-2 font-mono text-[0.9375rem]"
+          className="mt-2 w-full border bg-card px-3 py-2 font-mono text-sm"
         />
 
         <button
           type="button"
           onClick={confirmDelete}
           disabled={!armed || deleting}
-          className="mt-4 border border-err/60 bg-panel px-3 py-2 text-[0.78rem] font-semibold text-err disabled:opacity-60"
+          className="mt-4 border border-destructive/60 bg-card px-3 py-2 text-sm font-semibold text-destructive disabled:opacity-60"
         >
           {deleting ? "Deleting…" : "Delete project"}
         </button>
 
         {state.phase === "failed" ? (
-          <p role="alert" className="mt-4 border border-err/40 bg-panel p-3 text-err">
+          <p
+            role="alert"
+            className="mt-4 border border-destructive/40 bg-card p-3 text-destructive"
+          >
             {failureMessage(state.error)}
           </p>
         ) : null}
@@ -117,7 +120,7 @@ export const DeleteProjectDialog = ({ open, project, onClose, restoreFocusTo }: 
         <button
           type="button"
           onClick={onClose}
-          className="mt-6 block text-[0.78rem] font-semibold text-ink-soft underline"
+          className="mt-6 block text-sm font-semibold text-muted-foreground underline"
         >
           Cancel
         </button>

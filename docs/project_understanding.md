@@ -54,7 +54,12 @@ injects the one plugin directly, so a second source also means wiring it there.
 ## The main objective: from recorded sessions to learned sessions
 
 The long-term goal every design decision should serve: **turn the session archive into a
-feedback loop that makes the next session better.**
+feedback loop that makes the next session better.** The AI analyzer exists for this loop,
+not for scoring: its output is an *analysis* whose learnings are compounding input. A
+sever enough learning (sev 3+) must name where it lands — CLAUDE.md, `docs/patterns/`, a
+breadcrumb, a skill, a code change — and what change it proposes; accepted learnings get
+applied, not archived. (2026-10-13 owner decision: the analyzer is rated on whether its
+learnings compound, and the UI orders/filters by severity and impact accordingly.)
 
 Recording is table stakes. The trajectory the platform is on:
 

@@ -557,7 +557,7 @@ export const runAiReview = async (
         }
       ).learnings.some((learning) =>
         /\b(?:failure|fail(?:ed|ure)?|tool\s+fail|retry\s+fail|error\s+count|bash\s+fail)\b/i.test(
-          learning.title + " " + learning.detail,
+          `${learning.title} ${learning.detail}`,
         ),
       )
     if (hasToolFailures && !agentLearnsAboutFailures) {
