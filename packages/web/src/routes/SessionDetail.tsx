@@ -21,13 +21,17 @@ import {
   startAiReview,
 } from "../api/review.js"
 import type {
+  AiCompoundTarget,
+  AiImpactScope,
   AiLearning,
+  AiLearningSeverity,
   AiReviewCounts,
   AiReviewNumbers,
   AiReviewPartial,
   AiReviewSignals,
   AiTimelineEntry,
   AiTimelineEntryKind,
+  AiTimelineMarker,
   CapturedArtifact,
   ReviewerTranscriptEntry,
   SessionDetailPayload,
@@ -912,6 +916,37 @@ const TimelineEntryRow = ({
         <span className="mt-1 block text-[0.82rem] text-muted-foreground">
           {displayReviewText(entry.summary)}
         </span>
+        {entry.markers === undefined || entry.markers.length === 0 ? null : (
+          <span className="mt-1.5 flex flex-wrap gap-1.5">
+            {entry.markers.map((marker) => (
+              <Chip key={marker} tone={MARKER_TONE[marker]}>
+                {MARKER_LABEL[marker]}
+              </Chip>
+            ))}
+          </span>
+        )}
+        {entry.evidence === undefined || entry.evidence.length === 0 ? null : (
+          // Inside the whole-row link, so these stay plain text: a nested anchor would be
+          // invalid and would break the row's own navigation. The row already lands on the
+          // entry's first message, so the quote only has to say what happened.
+          <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[0.78rem]">
+            {entry.evidence.map((item) => {
+              const quote = displayReviewText(item.what) || "session evidence"
+              const clipped = quote.length > 48 ? `${quote.slice(0, 48).trimEnd()}…` : quote
+              return (
+                <span
+                  key={`${item.seq}·${item.messageId}`}
+                  className="inline-flex items-baseline gap-1.5"
+                >
+                  <span className="font-mono text-muted-foreground">seq {item.seq}</span>
+                  <span className="text-muted-foreground" title={quote}>
+                    {clipped}
+                  </span>
+                </span>
+              )
+            })}
+          </span>
+        )}
       </span>
     </>
   )
@@ -965,23 +1000,196 @@ const TimelineSection = ({
   )
 }
 
+// A time-series of the beats that mattered: every decision, dead end and failure plotted by
+// its seq across the session, so the shape reads at a glance — where it stalled, where it
+// turned. The timeline rows below carry the same markers in narrative order, with links.
+const MarkerStrip = ({ entries }: { entries: ReadonlyArray<AiTimelineEntry> }) => {
+  const marked = entries.flatMap((entry) =>
+    (entry.markers ?? []).map((marker) => ({ entry, marker })),
+  )
+  if (marked.length === 0) return null
+  const lastSeq = Math.max(1, ...entries.map((entry) => entry.toSeq))
+  const legend = (["decision", "dead-end", "failure"] as const)
+    .map((marker) => ({ marker, n: marked.filter((beat) => beat.marker === marker).length }))
+    .filter((row) => row.n > 0)
+  return (
+    <section className="mt-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <LensHeading>Important beats</LensHeading>
+        <span className="font-mono text-[0.72rem] text-muted-foreground">
+          {legend.map((row) => `${row.n} ${MARKER_LABEL[row.marker].toLowerCase()}`).join(" · ")}
+        </span>
+      </div>
+      <div
+        role="img"
+        aria-label="important beats across the session"
+        className="relative h-2.5 w-full rounded-pill border border bg-card-2"
+      >
+        {marked.map(({ entry, marker }) => (
+          <span
+            key={`${entry.id}:${marker}`}
+            data-testid="beat-dot"
+            title={`${MARKER_LABEL[marker]} · ${displayReviewText(entry.title)}`}
+            className={`absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card-2 ${MARKER_DOT_TONE[marker]}`}
+            style={{ left: `${Math.min(100, Math.max(0, (entry.fromSeq / lastSeq) * 100))}%` }}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+const failedCallsCensus = (census: Record<string, number>): string =>
+  Object.entries(census)
+    .sort(([, a], [, b]) => b - a)
+    .map(([tool, n]) => `${tool} ${n}`)
+    .join(", ")
+
+// What the agent tripped over, straight from the export: the failed tool calls the server
+// counted, each linking to its record. A review must never depend on the reviewer noticing a
+// failure for the reader to see it, so this renders whether or not any learning mentions it.
+const FailedCallsSection = ({
+  numbers,
+  linkFor,
+}: {
+  numbers: AiReviewNumbers
+  linkFor: (messageId: string) => GroundingHref
+}) => {
+  const failed = numbers.failedCalls ?? []
+  const census = numbers.toolFailures ?? {}
+  const total = Object.values(census).reduce((sum, n) => sum + n, 0)
+  if (failed.length === 0 && total === 0) return null
+  const censusText = failedCallsCensus(census)
+  return (
+    <section className="mt-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <LensHeading>What the agent tripped over</LensHeading>
+        {total === 0 ? null : (
+          <span className="font-mono text-[0.72rem] text-muted-foreground">
+            {total} failed {total === 1 ? "call" : "calls"}
+            {censusText === "" ? "" : ` · ${censusText}`}
+          </span>
+        )}
+      </div>
+      {failed.length === 0 ? (
+        <p className="text-[0.82rem] text-muted-foreground">
+          The run recorded failed tool calls, but the export carried no individual records to link —
+          the census above is the whole story.
+        </p>
+      ) : (
+        <>
+          <ul className="flex flex-wrap gap-2">
+            {failed.map((call) => {
+              const href = linkFor(call.messageId)
+              const label = (
+                <>
+                  <span className="font-semibold">{call.tool}</span>
+                  <span className="font-mono text-muted-foreground">seq {call.seq}</span>
+                </>
+              )
+              return (
+                <li key={`${call.seq}:${call.messageId}`}>
+                  {href === null ? (
+                    <span className="inline-flex items-baseline gap-1.5 border border bg-card-2 px-2 py-0.5 text-[0.78rem]">
+                      {label}
+                    </span>
+                  ) : (
+                    <Link
+                      to={href}
+                      className="inline-flex items-baseline gap-1.5 border border bg-card px-2 py-0.5 text-[0.78rem] hover:border-primary-soft"
+                    >
+                      {label}
+                    </Link>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+          {total > failed.length ? (
+            <p className="mt-1.5 text-[0.78rem] text-muted-foreground">
+              Showing the first {failed.length} of {total} failed calls.
+            </p>
+          ) : null}
+        </>
+      )}
+    </section>
+  )
+}
+
 const Chip = ({ tone, children }: { tone: string; children: React.ReactNode }) => (
   <Badge variant="outline" className={tone}>
     {children}
   </Badge>
 )
 
-const SEVERITY_TONE: Readonly<Record<string, string>> = {
-  low: "border text-muted-foreground",
-  medium: "border-amber-100/40 text-amber-600",
-  high: "border-destructive/40 text-destructive",
+// Severity is a 1–5 tier in current payloads and a legacy word on older rows. Both heal to
+// the same tier so the chip, the sort and the default filter agree across every stored row.
+const LEGACY_SEVERITY_TIER: Readonly<Record<string, number>> = { low: 2, medium: 3, high: 4 }
+
+export const severityTierOf = (severity: AiLearningSeverity | undefined): number | null => {
+  if (severity === undefined) return null
+  if (typeof severity === "number") return severity
+  return LEGACY_SEVERITY_TIER[severity] ?? null
 }
 
-/** Severity reads as a word, not a whisper: "Medium" is a label, "medium" is a hint. */
-const SEVERITY_LABEL: Readonly<Record<string, string>> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
+const SEVERITY_TONE: Readonly<Record<number, string>> = {
+  1: "border text-muted-foreground",
+  2: "border text-muted-foreground",
+  3: "border-amber-100/40 text-amber-600",
+  4: "border-destructive/40 text-destructive",
+  5: "border-destructive bg-destructive/5 text-destructive",
+}
+
+/** Severity reads as a word, not a whisper: "High" is a label, "high" is a hint. */
+const SEVERITY_LABEL: Readonly<Record<number, string>> = {
+  1: "Minor",
+  2: "Low",
+  3: "Medium",
+  4: "High",
+  5: "Critical",
+}
+
+/**
+ * The tier a finding must clear to render before the reader asks: tiers 1–2 are polish, and a
+ * review that leads with polish buries the two or three things that actually mattered. A group
+ * with nothing elevated still shows everything, so a quiet session never renders as empty.
+ */
+const ELEVATED_TIER = 3
+
+const IMPACT_LABEL: Readonly<Record<AiImpactScope, string>> = {
+  "this-session": "this session only",
+  "every-session": "every session",
+  "every-agent": "every agent",
+}
+
+const COMPOUND_TARGET_LABEL: Readonly<Record<AiCompoundTarget, string>> = {
+  none: "no target",
+  docs: "docs",
+  breadcrumbs: "breadcrumbs",
+  tools: "tools",
+  scripts: "scripts",
+  skills: "skills",
+  "code-changes": "code changes",
+}
+
+// The salient beats a timeline entry can carry: a decision, a dead end, a failure. They are
+// what the reader is scanning for, so they get a chip on the row and a dot on the beat strip.
+const MARKER_LABEL: Readonly<Record<AiTimelineMarker, string>> = {
+  decision: "Decision",
+  "dead-end": "Dead end",
+  failure: "Failure",
+}
+
+const MARKER_TONE: Readonly<Record<AiTimelineMarker, string>> = {
+  decision: "border-amber-100/40 text-amber-600",
+  "dead-end": "border-destructive/40 text-destructive",
+  failure: "border-destructive/40 text-destructive",
+}
+
+const MARKER_DOT_TONE: Readonly<Record<AiTimelineMarker, string>> = {
+  decision: "bg-amber-600",
+  "dead-end": "bg-destructive",
+  failure: "bg-destructive",
 }
 
 // Titles beginning this way are explicit nothing-entries: the audience was considered and
@@ -1010,17 +1218,28 @@ const LearningRow = ({
     )
   }
 
+  const tier = severityTierOf(learning.severity)
   return (
     <li className="border border bg-card p-3">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        {learning.severity === undefined ? null : (
-          <Chip tone={SEVERITY_TONE[learning.severity] ?? "border text-muted-foreground"}>
-            {SEVERITY_LABEL[learning.severity] ?? learning.severity}
+        {tier === null ? null : (
+          <Chip tone={SEVERITY_TONE[tier] ?? "border text-muted-foreground"}>
+            {SEVERITY_LABEL[tier] ?? `Tier ${tier}`}
           </Chip>
         )}
         <span className="text-foreground font-semibold leading-snug">
           {displayReviewText(learning.title)}
         </span>
+        {learning.impact === undefined ? null : (
+          <span className="font-mono text-[0.72rem] text-muted-foreground">
+            {IMPACT_LABEL[learning.impact]}
+          </span>
+        )}
+        {learning.compoundTarget === undefined || learning.compoundTarget === "none" ? null : (
+          <span className="font-mono text-[0.72rem] text-muted-foreground">
+            → {COMPOUND_TARGET_LABEL[learning.compoundTarget]}
+          </span>
+        )}
         {learning.cost === undefined ? null : (
           <span className="text-muted-foreground text-muted-foreground">{learning.cost}</span>
         )}
@@ -1031,6 +1250,12 @@ const LearningRow = ({
       {learning.nextTime === undefined || learning.nextTime.trim() === "" ? null : (
         <p className="mt-1.5 text-[0.82rem] text-foreground">
           <span className="font-semibold">Next time:</span> {displayReviewText(learning.nextTime)}
+        </p>
+      )}
+      {learning.compoundWhy === undefined || learning.compoundWhy.trim() === "" ? null : (
+        <p className="mt-1.5 text-[0.78rem] text-muted-foreground">
+          <span className="font-semibold">Compounds:</span>{" "}
+          {displayReviewText(learning.compoundWhy)}
         </p>
       )}
       {learning.evidence.length === 0 ? null : (
@@ -1079,6 +1304,65 @@ const LearningRow = ({
         </p>
       )}
     </li>
+  )
+}
+
+const tierRank = (learning: AiLearning): number => severityTierOf(learning.severity) ?? 0
+
+// Findings arrive in the order that matters: elevated tiers first, then the polish. Tiers 1–2
+// fold behind one toggle when something elevated exists, so the few things that mattered are
+// never buried under a dozen nits. A group with nothing elevated shows everything, and a
+// "Nothing to change" note always stays visible because it is information, not a finding.
+const LearningGroup = ({
+  heading,
+  learnings,
+  linkFor,
+  lessonFor,
+}: {
+  /** Rendered as an h4; omit when the caller already supplies the section heading. */
+  heading?: string
+  learnings: ReadonlyArray<AiLearning>
+  linkFor: (messageId: string) => GroundingHref
+  lessonFor: (learning: AiLearning) => SessionLearning | undefined
+}) => {
+  const [showMinor, setShowMinor] = useState(false)
+  const notes = learnings.filter((learning) => isNothingEntry(learning.title))
+  const findings = learnings
+    .filter((learning) => !isNothingEntry(learning.title))
+    .slice()
+    .sort((a, b) => tierRank(b) - tierRank(a))
+  const elevated = findings.filter((learning) => tierRank(learning) >= ELEVATED_TIER)
+  const minor = findings.filter((learning) => tierRank(learning) < ELEVATED_TIER)
+  const revealMinor = showMinor || elevated.length === 0
+  const visible = revealMinor ? [...elevated, ...minor] : elevated
+  const hiddenCount = revealMinor ? 0 : minor.length
+  return (
+    <div className="mt-3">
+      {heading === undefined ? null : (
+        <h4 className="mb-1.5 text-[0.875rem] font-semibold">{heading}</h4>
+      )}
+      <ul className="flex flex-col gap-2">
+        {[...visible, ...notes].map((learning) => (
+          <LearningRow
+            key={learning.title}
+            learning={learning}
+            linkFor={linkFor}
+            lesson={lessonFor(learning)}
+          />
+        ))}
+      </ul>
+      {hiddenCount === 0 ? null : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowMinor(true)}
+          className="mt-2 font-mono"
+        >
+          Show {hiddenCount} lower-priority {hiddenCount === 1 ? "finding" : "findings"}
+        </Button>
+      )}
+    </div>
   )
 }
 
@@ -1407,8 +1691,8 @@ const LEARNING_GROUPS: ReadonlyArray<{
   readonly heading: string
   readonly name: "humanLearnings" | "agentLearnings"
 }> = [
-  { heading: "What you could do differently", name: "humanLearnings" },
   { heading: "What the agent could do better", name: "agentLearnings" },
+  { heading: "What you could do differently", name: "humanLearnings" },
 ]
 
 /** Reusable discoveries from the breadcrumbs lens: tools, queries, paths worth keeping. */ const breadcrumbsOf =
@@ -1632,6 +1916,7 @@ const AiReviewCard = ({
         ) : (
           <>
             <TimeStrip entries={entries} totalMs={totalMs} failedSeqs={failedSeqs} />
+            <MarkerStrip entries={entries} />
             {review.analyzer === "ai-v2" ? (
               <details className="group mt-4 border border bg-card-2">
                 <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 font-semibold hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink [&::-webkit-details-marker]:hidden">
@@ -1666,23 +1951,19 @@ const AiReviewCard = ({
           </>
         )}
 
+        {numbers === undefined ? null : <FailedCallsSection numbers={numbers} linkFor={linkFor} />}
+
         {groups.length === 0 ? null : (
           <section className="mt-4">
             <LensHeading>Learnings</LensHeading>
             {groups.map((group) => (
-              <div key={group.heading} className="mt-3">
-                <h4 className="mb-1.5 text-[0.875rem] font-semibold">{group.heading}</h4>
-                <ul className="flex flex-col gap-2">
-                  {group.learnings.map((learning) => (
-                    <LearningRow
-                      key={learning.title}
-                      learning={learning}
-                      linkFor={linkFor}
-                      lesson={lessonFor(learning)}
-                    />
-                  ))}
-                </ul>
-              </div>
+              <LearningGroup
+                key={group.heading}
+                heading={group.heading}
+                learnings={group.learnings}
+                linkFor={linkFor}
+                lessonFor={lessonFor}
+              />
             ))}
           </section>
         )}
@@ -1715,16 +1996,7 @@ const AiReviewCard = ({
         {breadcrumbs.length === 0 ? null : (
           <section className="mt-4">
             <LensHeading>Breadcrumbs and tools worth keeping</LensHeading>
-            <ul className="flex flex-col gap-2">
-              {breadcrumbs.map((learning) => (
-                <LearningRow
-                  key={learning.title}
-                  learning={learning}
-                  linkFor={linkFor}
-                  lesson={lessonFor(learning)}
-                />
-              ))}
-            </ul>
+            <LearningGroup learnings={breadcrumbs} linkFor={linkFor} lessonFor={lessonFor} />
           </section>
         )}
 

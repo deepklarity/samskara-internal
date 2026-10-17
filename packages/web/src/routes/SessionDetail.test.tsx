@@ -1328,7 +1328,7 @@ const ENRICHED_AI_REVIEW = {
             detail: "The prompt was complete and specific.",
             category: "communication",
             audience: "human",
-            severity: "low",
+            severity: 2,
             nextTime: "",
             evidence: [],
           },
@@ -1342,7 +1342,7 @@ const ENRICHED_AI_REVIEW = {
             detail: "The agent silently substituted its own reconstruction.",
             category: "approach",
             audience: "agent",
-            severity: "medium",
+            severity: 3,
             nextTime: "When an input contract breaks, name it in the reply and proceed marked.",
             cost: "a trust cost",
             evidence: [{ seq: 47, messageId: "m-47", what: "the pivot decision" }],
@@ -1352,7 +1352,7 @@ const ENRICHED_AI_REVIEW = {
             detail: "About 20 bash calls walked the schema before the first real query.",
             category: "efficiency",
             audience: "agent",
-            severity: "low",
+            severity: 2,
             nextTime: "Read the schema in one query, then run the queries you need.",
             cost: "most of the 71s reconstruction block",
             evidence: [{ seq: 34, messageId: "m-34", what: "first schema probe" }],
@@ -1367,7 +1367,7 @@ const ENRICHED_AI_REVIEW = {
             detail: "session.json never landed in the workspace.",
             category: "pipeline",
             audience: "agent",
-            severity: "high",
+            severity: 4,
             nextTime: "Assert the export exists before spawning the reviewer.",
             cost: "95s of 278s — 34% of the session",
             evidence: [{ seq: 4, messageId: "m-4", what: "first failed read" }],
@@ -2117,6 +2117,178 @@ test("AI-9c: learnings render under the three audience headers with severity, co
     .closest("li") as HTMLElement
   expect(within(nothing).queryByRole("button")).not.toBeInTheDocument()
   expect(within(nothing).queryByText(/^(low|medium|high)$/)).not.toBeInTheDocument()
+})
+
+test("AI-9c: severity is a tier — the chip labels the tier and lower tiers fold behind one toggle", async () => {
+  const user = userEvent.setup()
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [ENRICHED_AI_REVIEW] } },
+  })
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+
+  const panel = panelOf()
+  const agentGroup = within(panel).getByRole("heading", {
+    name: "What the agent could do better",
+  }).parentElement as HTMLElement
+  // Tier 3 "Escalate…" is elevated and visible; tier 2 "Probe…" is folded away and counted.
+  const escalate = within(agentGroup)
+    .getByText(/escalate before swapping/i)
+    .closest("li") as HTMLElement
+  expect(within(escalate).getByText("Medium")).toBeInTheDocument()
+  expect(within(agentGroup).queryByText(/probe a schema once/i)).not.toBeInTheDocument()
+  const toggle = within(agentGroup).getByRole("button", {
+    name: /show 1 lower-priority finding/i,
+  })
+  await user.click(toggle)
+  expect(within(agentGroup).getByText(/probe a schema once/i)).toBeInTheDocument()
+  expect(
+    within(agentGroup).queryByRole("button", { name: /lower-priority/i }),
+  ).not.toBeInTheDocument()
+})
+
+test("AI-9c: a legacy severity word on an old row heals to its tier for the chip", async () => {
+  const user = userEvent.setup()
+  const legacy = {
+    ...ENRICHED_AI_REVIEW,
+    signals: {
+      ...ENRICHED_AI_REVIEW.signals,
+      lenses: ENRICHED_AI_REVIEW.signals.lenses.map((lens) => {
+        if (lens.lens !== "breadcrumbs") return lens
+        return {
+          ...lens,
+          learnings: (lens.learnings ?? []).map((learning) => ({ ...learning, severity: "high" })),
+        }
+      }),
+    },
+  }
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [legacy] } },
+  })
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+
+  const panel = panelOf()
+  const row = within(panel)
+    .getByText(/exporter delivered an empty promise/i)
+    .closest("li") as HTMLElement
+  expect(within(row).getByText("High")).toBeInTheDocument()
+})
+
+test("AI-9c: impact and compound-target render as chips beside a finding, with the why line", async () => {
+  const user = userEvent.setup()
+  const compounding = {
+    ...ENRICHED_AI_REVIEW,
+    signals: {
+      ...ENRICHED_AI_REVIEW.signals,
+      lenses: ENRICHED_AI_REVIEW.signals.lenses.map((lens) => {
+        if (lens.lens !== "agentLearnings") return lens
+        return {
+          ...lens,
+          learnings: (lens.learnings ?? []).map((learning) =>
+            learning.severity === 3
+              ? {
+                  ...learning,
+                  impact: "every-session",
+                  compoundTarget: "docs",
+                  compoundWhy: "Write the habit where the next prompt is written from.",
+                }
+              : learning,
+          ),
+        }
+      }),
+    },
+  }
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [compounding] } },
+  })
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+
+  const panel = panelOf()
+  const row = within(panel)
+    .getByText(/escalate before swapping/i)
+    .closest("li") as HTMLElement
+  expect(within(row).getByText("every session")).toBeInTheDocument()
+  expect(within(row).getByText("→ docs")).toBeInTheDocument()
+  expect(
+    within(row).getByText(/Write the habit where the next prompt is written from\./),
+  ).toBeInTheDocument()
+})
+
+test("AI-9c: timeline markers render as chips over a beat strip, and entry evidence quotes inline", async () => {
+  const user = userEvent.setup()
+  const marked = {
+    ...ENRICHED_AI_REVIEW,
+    signals: {
+      ...ENRICHED_AI_REVIEW.signals,
+      lenses: ENRICHED_AI_REVIEW.signals.lenses.map((lens) => {
+        if (lens.lens !== "timeline") return lens
+        return {
+          ...lens,
+          entries: (lens.entries ?? []).map((entry) =>
+            entry.id === "pivot"
+              ? {
+                  ...entry,
+                  markers: ["decision"],
+                  evidence: [
+                    { seq: 29, messageId: "m-29", what: "the agent chose to rebuild the export" },
+                  ],
+                }
+              : entry,
+          ),
+        }
+      }),
+    },
+  }
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [marked] } },
+  })
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+
+  const panel = panelOf()
+  expect(within(panel).getByRole("heading", { name: /important beats/i })).toBeInTheDocument()
+  expect(within(panel).getAllByTestId("beat-dot")).toHaveLength(1)
+  expect(within(panel).getByText("Decision")).toBeInTheDocument()
+  expect(within(panel).getByText(/the agent chose to rebuild the export/)).toBeInTheDocument()
+})
+
+test("AI-9c: failed tool calls render deterministically from the export, whether or not a learning names them", async () => {
+  const user = userEvent.setup()
+  const withFailures = {
+    ...ENRICHED_AI_REVIEW,
+    signals: {
+      ...ENRICHED_AI_REVIEW.signals,
+      numbers: {
+        ...ENRICHED_AI_REVIEW.signals.numbers,
+        toolFailures: { bash: 2, edit: 1 },
+        failedCalls: [
+          { seq: 3, messageId: "m-3", tool: "bash", status: "failure" },
+          { seq: 12, messageId: "m-12", tool: "bash", status: "failure" },
+          { seq: 47, messageId: "m-47", tool: "edit", status: "failure" },
+        ],
+      },
+    },
+  }
+  renderDetail(PAYLOAD, OK_EMPTY, "/sessions/s-1", {
+    review: { status: 200, body: { reviews: [withFailures] } },
+  })
+
+  await waitFor(() => expect(tabs()).toHaveLength(6))
+  await user.click(screen.getByRole("tab", { name: /Review/ }))
+
+  const panel = panelOf()
+  expect(
+    within(panel).getByRole("heading", { name: /what the agent tripped over/i }),
+  ).toBeInTheDocument()
+  expect(within(panel).getByText(/3 failed calls · bash 2, edit 1/)).toBeInTheDocument()
+  const link = within(panel).getByRole("link", { name: /bash\s*seq 3/ })
+  expect(link).toHaveAttribute("href", expect.stringContaining("m=m-3"))
 })
 
 test("AI-9c: timeline rows render a tone dot on a vertical rail plus a proportional segment bar", async () => {

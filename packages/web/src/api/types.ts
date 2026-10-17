@@ -68,6 +68,7 @@ export type SessionLearning = Ok<
  * when the payload actually carries it.
  */
 export type AiTimelineEntryKind = "phase" | "event" | "turning-point"
+export type AiTimelineMarker = "decision" | "dead-end" | "failure"
 
 export type AiTimelineEntry = {
   readonly id: string
@@ -79,10 +80,16 @@ export type AiTimelineEntry = {
   readonly messageIds: ReadonlyArray<string>
   readonly tracks: ReadonlyArray<string>
   readonly tags?: ReadonlyArray<string>
+  /** Salient beats the entry should never hide: a decision, a dead-end, a failure. */
+  readonly markers?: ReadonlyArray<AiTimelineMarker>
+  /** Session refs pinpointing what happened inside the entry. */
+  readonly evidence?: ReadonlyArray<AiLearningEvidence>
   /** Wall-clock span of the entry, derived server-side from export timestamps. */
   readonly durationMs?: number
   /** Wall-clock offset of the entry's start from the session's first message. */
   readonly startMs?: number
+  /** The same span with unattended gaps (>1h) removed, so idle time never reads as work. */
+  readonly activeMs?: number
 }
 
 export type AiLearningEvidence = {
@@ -92,7 +99,18 @@ export type AiLearningEvidence = {
 }
 
 export type AiLearningAudience = "human" | "agent" | "harness"
-export type AiLearningSeverity = "low" | "medium" | "high"
+/** Current payloads carry a 1–5 tier; older rows carry the legacy word. */
+export type AiSeverityTier = 1 | 2 | 3 | 4 | 5
+export type AiLearningSeverity = AiSeverityTier | "low" | "medium" | "high"
+export type AiImpactScope = "this-session" | "every-session" | "every-agent"
+export type AiCompoundTarget =
+  | "none"
+  | "docs"
+  | "breadcrumbs"
+  | "tools"
+  | "scripts"
+  | "skills"
+  | "code-changes"
 
 export type AiLearning = {
   readonly title: string
@@ -105,6 +123,12 @@ export type AiLearning = {
   readonly nextTime?: string
   /** Short measurable cost, e.g. "95s of 278s — 34% of the session". */
   readonly cost?: string
+  /** How broad the finding is: this session only, every session, or every agent. */
+  readonly impact?: AiImpactScope
+  /** Why this finding compounds — read only for tier ≥ 3 findings. */
+  readonly compoundWhy?: string
+  /** Where the durable fix belongs, so a consumer can route it out of the list. */
+  readonly compoundTarget?: AiCompoundTarget
   readonly evidence: ReadonlyArray<AiLearningEvidence>
 }
 
@@ -139,6 +163,13 @@ export type AiReviewNumbers = {
   readonly toolCallCount?: number
   /** Deterministic per-tool failure census (failure + cancelled statuses). */
   readonly toolFailures?: Record<string, number>
+  /** The failures themselves (up to a dozen), each with the seq a reader can click. */
+  readonly failedCalls?: ReadonlyArray<{
+    readonly seq: number
+    readonly messageId: string
+    readonly tool: string
+    readonly status: string
+  }>
   readonly inputTokens?: number
   readonly outputTokens?: number
   readonly cachedTokens?: number
