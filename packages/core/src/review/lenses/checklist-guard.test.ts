@@ -39,7 +39,7 @@ const agentLearning = (overrides: Partial<AgentLearning> = {}): AgentLearning =>
   detail: "The tests named the exact convention the edit broke.",
   category: "approach" as const,
   audience: "agent" as const,
-  severity: "low" as const,
+  severity: 2,
   nextTime: "Read the covering test before editing the source it guards.",
   evidence: [{ seq: 5, messageId: "msg-5", what: "the failing test run" }],
   ...overrides,

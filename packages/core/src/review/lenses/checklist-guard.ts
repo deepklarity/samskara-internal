@@ -15,7 +15,7 @@ export type ToolFailureChecklistResult = {
  * A review with toolFailures > 0 and no such agent learning is incomplete.
  */
 export const validateToolFailureChecklist = (
-  payload: AiReviewPayload,
+  payload: Pick<AiReviewPayload, "lenses">,
   toolFailures: number,
 ): ToolFailureChecklistResult => {
   if (toolFailures === 0) {

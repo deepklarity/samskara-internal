@@ -76,6 +76,23 @@ export const validateGrounding = (
             })
           }
         }
+        // Timeline evidence cites the transcript the same way learnings do: a quote nobody can
+        // click through is worse than no quote, so the refs are audited, not trusted.
+        for (const [evidenceIndex, evidence] of (entry.evidence ?? []).entries()) {
+          const evidencePath = `${entryPath}.evidence[${evidenceIndex}]`
+          if (!index.seqs.has(evidence.seq)) {
+            problems.push({
+              path: `${evidencePath}.seq`,
+              problem: `seq ${evidence.seq} is not a seq in the session export`,
+            })
+          }
+          if (!index.messageIds.has(evidence.messageId)) {
+            problems.push({
+              path: `${evidencePath}.messageId`,
+              problem: `messageId "${evidence.messageId}" is not in the session export`,
+            })
+          }
+        }
         if (previous !== undefined && entry.fromSeq <= previous) {
           problems.push({
             path: `${entryPath}.fromSeq`,

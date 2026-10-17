@@ -4,9 +4,9 @@ import {
   aiReviewPayloadSchema,
   BREADCRUMB_CATEGORIES,
   HUMAN_LEARNING_CATEGORIES,
-  LEARNING_SEVERITIES,
   NOTHING_TO_CHANGE_PREFIX,
   reviewCountsSchema,
+  SEVERITY_TIERS,
   TIMELINE_ENTRY_KINDS,
 } from "./schema.js"
 
@@ -34,7 +34,7 @@ const humanLearning = (overrides: Record<string, unknown> = {}) => ({
   detail: "The first prompt omitted the path, so the agent guessed wrong.",
   category: "communication",
   audience: "human",
-  severity: "medium",
+  severity: 3,
   nextTime: "Open the task by naming the exact file to change.",
   evidence: [evidence()],
   ...overrides,
@@ -45,7 +45,7 @@ const agentLearning = (overrides: Record<string, unknown> = {}) => ({
   detail: "The tests named the exact convention the edit broke.",
   category: "approach",
   audience: "agent",
-  severity: "low",
+  severity: 2,
   nextTime: "Read the covering test before editing the source it guards.",
   evidence: [evidence({ seq: 5, messageId: "msg-5", what: "the failing test run" })],
   ...overrides,
@@ -56,7 +56,7 @@ const breadcrumbLearning = (overrides: Record<string, unknown> = {}) => ({
   detail: "The query lists failed jobs with their last error, so nobody re-derives it.",
   category: "query",
   audience: "agent",
-  severity: "low",
+  severity: 2,
   nextTime: "Reach for this query before writing a new one against the jobs table.",
   evidence: [evidence({ seq: 1, messageId: "msg-1", what: "the query was worked out here" })],
   ...overrides,
@@ -204,7 +204,7 @@ describe("aiReviewPayloadSchema", () => {
         ).success,
       ).toBe(true)
     }
-    for (const severity of LEARNING_SEVERITIES) {
+    for (const severity of SEVERITY_TIERS) {
       expect(
         aiReviewPayloadSchema.safeParse(withLearning("humanLearnings", humanLearning({ severity })))
           .success,
@@ -363,7 +363,7 @@ describe("aiReviewPayloadSchema", () => {
       samplePayload({
         lenses: [
           { lens: "timeline", entries: [timelineEntry()] },
-          { lens: "humanLearnings", learnings: [humanLearning({ severity: "catastrophic" })] },
+          { lens: "humanLearnings", learnings: [humanLearning({ severity: 9 })] },
           { lens: "agentLearnings", learnings: [] },
           { lens: "breadcrumbs", learnings: [] },
         ],
@@ -526,10 +526,10 @@ describe("aiReviewPayloadSchema", () => {
       })
 
     rejects(withEntry({ title: "x".repeat(121) }))
-    rejects(withEntry({ summary: "x".repeat(601) }))
+    rejects(withEntry({ summary: "x".repeat(1201) }))
     rejects(withEntry({ messageIds: [] }))
 
-    rejects(samplePayload({ summary: "x".repeat(601) }))
+    rejects(samplePayload({ summary: "x".repeat(1201) }))
 
     const withHuman = (learningOverrides: Record<string, unknown>) =>
       samplePayload({

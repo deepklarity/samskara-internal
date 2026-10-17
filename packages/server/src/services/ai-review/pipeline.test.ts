@@ -142,7 +142,10 @@ type FixtureLearning = {
   readonly nextTime?: string
   readonly category: string
   readonly audience: string
-  readonly severity: string
+  readonly severity: number
+  readonly impact?: string
+  readonly compoundTarget?: string
+  readonly compoundWhy?: string
   readonly evidence: ReadonlyArray<{
     readonly seq: number
     readonly messageId: string
@@ -208,7 +211,10 @@ const validPayload = (index: SessionExport["index"]): FixturePayload => ({
           nextTime: "Name the failing command in the prompt.",
           category: "communication",
           audience: "human",
-          severity: "medium",
+          severity: 3,
+          impact: "every-session",
+          compoundTarget: "docs",
+          compoundWhy: "Write the habit where the next prompt is written from.",
           evidence: [
             {
               seq: index.seqs[0] as number,
@@ -224,11 +230,11 @@ const validPayload = (index: SessionExport["index"]): FixturePayload => ({
       learnings: [
         {
           title: "Stop retrying a failing command",
-          detail: "The Bash call failed once; a different approach was available.",
+          detail: "The run numbers show bash=1 failed call; a different approach was available.",
           nextTime: "Try a different approach after the first failure.",
           category: "tool-use",
           audience: "agent",
-          severity: "low",
+          severity: 2,
           evidence: [
             {
               seq: index.seqs[1] as number,
@@ -248,7 +254,7 @@ const validPayload = (index: SessionExport["index"]): FixturePayload => ({
           nextTime: "Reach for this query before writing a new one against the jobs table.",
           category: "query",
           audience: "agent",
-          severity: "low",
+          severity: 2,
           evidence: [
             {
               seq: index.seqs[1] as number,
@@ -307,10 +313,22 @@ const xmlOf = (payload: FixturePayload, claimed?: ReviewCounts): string => {
     } else {
       lines.push(`  <${lens.lens}>`)
       for (const learning of lens.learnings) {
+        const attrs = [
+          `category="${learning.category}"`,
+          `audience="${learning.audience}"`,
+          `severity="${learning.severity}"`,
+          ...(learning.impact === undefined ? [] : [`impact="${learning.impact}"`]),
+          ...(learning.compoundTarget === undefined
+            ? []
+            : [`compound-target="${learning.compoundTarget}"`]),
+        ].join(" ")
         lines.push(
-          `    <learning category="${learning.category}" audience="${learning.audience}" severity="${learning.severity}">`,
+          `    <learning ${attrs}>`,
           `      <title>${esc(learning.title)}</title>`,
           `      <detail>${esc(learning.detail)}</detail>`,
+          ...(learning.compoundWhy === undefined
+            ? []
+            : [`      <compoundWhy>${esc(learning.compoundWhy)}</compoundWhy>`]),
           `      <nextTime>${esc(learning.nextTime ?? "")}</nextTime>`,
           "      <evidence>",
           ...learning.evidence.map(
@@ -1025,7 +1043,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
       nextTime: string
       category: string
       audience: string
-      severity: string
+      severity: number
       evidence: Array<{ seq: number; messageId: string; what: string }>
     }
     const learnings = Array.from({ length: 11 }, (_, i) => ({
@@ -1156,7 +1174,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     // durationMs is the session row's own span (earliest to latest message ts = 120s);
     // recordCount/toolCallCount count the export the reviewer actually saw (toolCall and
     // its result collapse into one record); tokens fold from the tokenUsage table.
-    expect(signals.numbers).toEqual({
+    expect(signals.numbers).toMatchObject({
       durationMs: 120_000,
       recordCount: 3,
       toolCallCount: 1,
@@ -1166,18 +1184,30 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
       cachedTokens: 10,
       thinkingTokens: 5,
     })
+    // The failures themselves, not just the counts: a reader can click the failing call.
+    expect((signals.numbers as { failedCalls?: unknown }).failedCalls).toEqual([
+      { seq: 1, messageId: sessionExport.records[1]?.id, tool: "bash", status: "failure" },
+    ])
     // Timeline durations derive from export record ts at fromSeq/toSeq — never model-claimed.
+    // activeMs is the same span with idle gaps (>1h) removed, so an overnight wait does not
+    // read as work.
     const lenses = signals.lenses as ReadonlyArray<{
       lens: string
-      entries?: ReadonlyArray<{ fromSeq: number; startMs?: number; durationMs?: number }>
+      entries?: ReadonlyArray<{
+        fromSeq: number
+        startMs?: number
+        durationMs?: number
+        activeMs?: number
+      }>
     }>
     const timeline = lenses.find((lens) => lens.lens === "timeline")
     const [first, second] = timeline?.entries ?? []
-    expect(first).toMatchObject({ fromSeq: 0, startMs: T0, durationMs: 0 })
+    expect(first).toMatchObject({ fromSeq: 0, startMs: T0, durationMs: 0, activeMs: 0 })
     expect(second).toMatchObject({
       fromSeq: 1,
       startMs: T0_PLUS_30S,
       durationMs: T0_PLUS_120S - T0_PLUS_30S,
+      activeMs: T0_PLUS_120S - T0_PLUS_30S,
     })
     // Payload-level span: first to last record ts.
     expect(signals.totalDurationMs).toBe(T0_PLUS_120S - T0)
@@ -1268,7 +1298,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
         nextTime: "Check that branch first.",
         category: "query",
         audience: "agent",
-        severity: "low",
+        severity: 2,
         evidence: [{ seq: 1, messageId: "msg-1", what: "branch mentioned" }],
       },
       {
@@ -1277,7 +1307,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
         nextTime: "Read that file next time.",
         category: "path",
         audience: "agent",
-        severity: "low",
+        severity: 2,
         evidence: [{ seq: 1, messageId: "msg-1", what: "file path mentioned" }],
       },
     ]
@@ -1298,7 +1328,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     // Should have exactly one "Nothing to change" entry with the contract's reason
     expect(breadcrumbsLensPersisted?.learnings).toHaveLength(1)
     const only = breadcrumbsLensPersisted?.learnings?.[0]
-    expect(only?.title).toBe("Nothing to change for the agent")
+    expect(only?.title).toBe("Nothing to change for breadcrumbs")
     expect(only?.detail).toBe(
       "No breadcrumb earned a place: candidates were session-specific pointers",
     )
@@ -1318,7 +1348,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
         nextTime: "Try a different approach first.",
         category: "approach",
         audience: "agent",
-        severity: "low",
+        severity: 2,
         evidence: [{ seq: 1, messageId: "msg-1", what: "the approach used" }],
       },
     ]
@@ -1334,8 +1364,52 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("runAiRevi
     // Should have a recovered note about the toolFailures cross-check
     expect(
       run.recovered.some(
-        (note) => note.includes("toolFailures") && note.includes("agent learning"),
+        (note) => note.includes("toolFailures=") && note.includes("tool-failure learning"),
       ),
     ).toBe(true)
+  })
+
+  test("toolFailures checklist: an agent learning that cites per-tool counts clears the note", async () => {
+    // The canonical fixture's agent learning already cites "bash=1" from the run numbers, so
+    // the session's one failed call is accounted for and no note is written.
+    const { runner } = fakeRunner(() => okBehaviour())
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result.kind).toBe("ok")
+    const signals = await persistedSignals()
+    const run = signals.run as { recovered: ReadonlyArray<string> }
+    expect(run.recovered.some((note) => note.includes("toolFailures"))).toBe(false)
+  })
+
+  test("compounding check: a severity >= 3 learning with no target adds a recovered note", async () => {
+    const payload = validPayload(sessionExport.index)
+    const agentLens = payload.lenses.find((l) => l.lens === "agentLearnings") as {
+      lens: "agentLearnings"
+      learnings: Array<FixtureLearning>
+    }
+    // The agent learning names no compound target; raised to tier 3 it must, and the absence
+    // is exactly what the normalizer reports.
+    agentLens.learnings = [{ ...(agentLens.learnings[0] as FixtureLearning), severity: 3 }]
+    const xml = xmlOf(payload)
+    const { runner } = fakeRunner(() => ({ stdout: "ready", file: xml }))
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result.kind).toBe("ok")
+    const signals = await persistedSignals()
+    const run = signals.run as { recovered: ReadonlyArray<string> }
+    expect(
+      run.recovered.some(
+        (note) => note.includes("compounding:") && note.includes("names no target"),
+      ),
+    ).toBe(true)
+  })
+
+  test("compound target persists as the learning's route so a consumer can act on it", async () => {
+    const { runner } = fakeRunner(() => okBehaviour())
+    const result = await runAiReview(depsWith(runner), userId, sessionId)
+    expect(result.kind).toBe("ok")
+    const rows = await db
+      .select()
+      .from(learningsTable)
+      .where(eq(learningsTable.projectId, projectId))
+    expect(rows.some((row) => row.route === "docs")).toBe(true)
   })
 })

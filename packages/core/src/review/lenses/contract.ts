@@ -63,12 +63,32 @@ the run, and the run has a hard time limit.
 
 ## What goes in each section
 
-- \`summary\`: one honest paragraph, at most 600 characters.
-- \`timeline\`: the phases and turning points only — about 5 to 8 entries, in ascending
-  \`from-seq\` order.
-- Every learning carries \`audience\` (matching its section), \`severity\`
-  (\`low|medium|high\`), one imperative \`nextTime\` sentence, and \`cost\` when you can
-  measure it (for example \`cost="95s of 278s"\`).
+- \`summary\`: the verdict for the whole session, at most 1200 characters. Say what was
+  asked, what happened, what landed, and what it cost.
+- \`timeline\`: the shape of the session — about 8 to 15 entries in ascending \`from-seq\`
+  order. Go past phase labels: name the decisions that were taken, the dead ends that were
+  backed out of, and the turn where the work changed direction. Mark them with
+  \`markers="decision"\`, \`markers="dead-end"\`, or \`markers="failure"\` (comma-separate
+  more than one). Give a decisive entry a live \`<evidence>\` quote
+  (\`<ref seq="N" message-id="msg-N"><what>…</what></ref>\`) so a reader can click to it.
+- Every learning carries \`audience\` (matching its section), a numeric \`severity\` tier
+  (\`1\` negligible, \`2\` minor, \`3\` notable, \`4\` serious, \`5\` critical), an
+  \`impact\` scope, one imperative \`nextTime\` sentence, and \`cost\` when you can measure
+  it (for example \`cost="95s of 278s"\`).
+
+## Severity, impact, and compounding
+
+- \`severity\` is a number 1–5, not a word. Reserve 4–5 for something that cost real time or
+  would break the next session; most findings are 2–3.
+- \`impact\` says how far the finding reaches: \`this-session\` (a fact about one session),
+  \`every-session\` (the same task shape will do this again), or \`every-agent\` (a rule that
+  belongs in the harness itself).
+- Any learning at \`severity\` 3 or higher MUST name a \`compound-target\` — where the durable
+  fix belongs: \`docs\`, \`breadcrumbs\`, \`tools\`, \`scripts\`, \`skills\`, \`code-changes\`,
+  or \`none\` (only when a lasting change genuinely should not outlive the session). Add a
+  \`<compoundWhy>\` sentence saying what keeps degrading if nobody writes it down.
+- A finding that is true only of this session and teaches nothing reusable is a timeline
+  entry, not a learning.
 
 ## The two audiences, and the breadcrumbs
 

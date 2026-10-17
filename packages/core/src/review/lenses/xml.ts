@@ -6,14 +6,17 @@ import {
   aiReviewPayloadSchema,
   BREADCRUMB_CATEGORIES,
   type BreadcrumbLearningCategory,
+  COMPOUND_TARGETS,
   HUMAN_LEARNING_CATEGORIES,
   type HumanLearningCategory,
-  LEARNING_SEVERITIES,
+  IMPACT_SCOPES,
   NOTHING_TO_CHANGE_PREFIX,
   type ReviewCounts,
   type ReviewLearningAudience,
   TIMELINE_ENTRY_KINDS,
+  TIMELINE_MARKERS,
   type TimelineEntryKind,
+  type TimelineMarker,
 } from "./schema.js"
 
 export const REVIEW_XML_ROOT = "review"
@@ -23,19 +26,22 @@ export const REVIEW_XML_ROOT = "review"
  *
  * - `review` — root. Attributes: `outcome`, `friction`, `model`, `harness` (model/harness may
  *   be `"?"`; the caller overwrites them with the runner's real values).
- * - `summary` — leaf text: the review summary (max 600). Also the per-entry summary leaf.
+ * - `summary` — leaf text: the review summary (max 1200). Also the per-entry summary leaf.
  * - `timeline` — the timeline section; contains `entry` elements.
  * - `entry` — one timeline entry. Attributes: `id`, `kind`, `from-seq`, `to-seq`, `tracks`
- *   (comma-separated), `tags` (comma-separated), and optionally `message-ids`
- *   (comma-separated) instead of the child container. Children: `title`, `summary`,
- *   `message-ids`. Kebab-case attributes have camelCase aliases (`fromSeq`, …).
+ *   (comma-separated), `tags` (comma-separated), `markers` (comma-separated, from
+ *   `decision|dead-end|failure`), and optionally `message-ids` (comma-separated) instead of
+ *   the child container. Children: `title`, `summary`, `message-ids`, `evidence`. Kebab-case attributes have camelCase aliases (`fromSeq`, …).
  * - `title` — leaf text: entry or learning title (max 120).
  * - `message-ids` — container of `id` elements.
  * - `id` — leaf text: one message id from session.json.
  * - `humanLearnings` / `agentLearnings` / `breadcrumbs` — the learnings sections, one per
  *   audience; each contains `learning` elements whose `audience` must match the section.
- * - `learning` — one learning. Attributes: `category`, `audience`, `severity`
- *   (low|medium|high), optional `cost`. Children: `title`, `detail`, `nextTime`, `evidence`.
+ * - `learning` — one learning. Attributes: `category`, `audience`, `severity` (tier 1–5;
+ *   legacy `low|medium|high` heal forward), optional `impact`
+ *   (`this-session|every-session|every-agent`), optional `compound-target`
+ *   (`none|docs|breadcrumbs|tools|scripts|skills|code-changes`), optional `cost`. Children:
+ *   `title`, `detail`, `nextTime`, `compoundWhy`, `evidence`.
  * - `detail` — leaf text: the learning's detail (max 600).
  * - `nextTime` — leaf text: one imperative sentence — what to do differently next time
  *   (max 300). May be empty only on a "Nothing to change" entry.
@@ -73,6 +79,7 @@ export const REVIEW_XML_TAGS = [
   "learning",
   "detail",
   "nextTime",
+  "compoundWhy",
   "evidence",
   "ref",
   "what",
@@ -106,11 +113,12 @@ export type ReviewXmlResult =
 const KNOWN_TAGS = new Set<string>(REVIEW_XML_TAGS)
 const TEXT_MAXES = {
   title: 120,
-  summary: 600,
+  summary: 1200,
   detail: 600,
   what: 200,
   nextTime: 300,
   cost: 120,
+  compoundWhy: 300,
 } as const
 type TextTag = keyof typeof TEXT_MAXES
 
@@ -157,25 +165,31 @@ export const reviewXmlTemplate = (): string =>
   <!-- The two verdict attributes take exact words only, no others:
        outcome:  shipped (the task's artifact landed) | productive (useful work, nothing delivered) | struggled (most of the session stuck) | aborted (ended before finishing)
        friction: none | moderate | high -->
-  <summary>REPLACE: one honest paragraph, at most 600 chars, the verdict for the whole session.</summary>
+  <summary>REPLACE: the verdict for the whole session in one honest paragraph, at most 1200 chars. Say what was asked, what happened, what landed, and what it cost.</summary>
   <timeline>
-    <!-- ${EXAMPLE_NOTE}
-    <entry id="explore-phase" kind="phase" from-seq="0" to-seq="3" tracks="main" tags="exploration">
+    <!-- ${EXAMPLE_NOTE} 8-15 entries is the target; include the decisions taken and the dead ends backed out of, not just phase labels.
+    <entry id="explore-phase" kind="phase" from-seq="0" to-seq="3" tracks="main" tags="exploration" markers="decision">
       <title>Exploration</title>
-      <summary>What happened across this stretch of work and why it mattered.</summary>
+      <summary>What happened across this stretch of work, why it mattered, and what it led to.</summary>
       <message-ids>
         <id>msg-0</id>
         <id>msg-2</id>
       </message-ids>
+      <evidence>
+        <ref seq="2" message-id="msg-2">
+          <what>a live quote or paraphrase from this span that shows the point</what>
+        </ref>
+      </evidence>
     </entry>
     -->
   </timeline>
   <humanLearnings>
     <!-- ${EXAMPLE_NOTE}
-    <learning category="communication" audience="human" severity="medium" cost="95s of 278s">
+    <learning category="communication" audience="human" severity="3" impact="every-session" compound-target="docs" cost="95s of 278s">
       <title>Name the file to touch</title>
       <detail>What the human could have done differently, in one or two sentences.</detail>
       <nextTime>One imperative sentence: what the human should do differently next time.</nextTime>
+      <compoundWhy>What keeps costing time if this is never written down.</compoundWhy>
       <evidence>
         <ref seq="7" message-id="msg-7">
           <what>what happened at that message</what>
@@ -186,10 +200,11 @@ export const reviewXmlTemplate = (): string =>
   </humanLearnings>
   <agentLearnings>
     <!-- ${EXAMPLE_NOTE}
-    <learning category="approach" audience="agent" severity="low">
+    <learning category="approach" audience="agent" severity="4" impact="every-agent" compound-target="code-changes">
       <title>Read the test before editing source</title>
       <detail>What the agent should have done differently, in one or two sentences.</detail>
       <nextTime>One imperative sentence: what the agent should do differently next time.</nextTime>
+      <compoundWhy>What continues to break in future sessions if the agent never learns this.</compoundWhy>
       <evidence>
         <ref seq="12" message-id="msg-12">
           <what>what happened at that message</what>
@@ -200,7 +215,7 @@ export const reviewXmlTemplate = (): string =>
   </agentLearnings>
   <breadcrumbs>
     <!-- ${EXAMPLE_NOTE}
-    <learning category="query" audience="agent" severity="low">
+    <learning category="query" audience="agent" severity="2" impact="every-session" compound-target="docs">
       <title>Failed-jobs lookup</title>
       <detail>The psql query that lists failed jobs with their last error, so nobody re-derives it.</detail>
       <nextTime>Reach for this before writing a new query against the jobs table.</nextTime>
@@ -529,9 +544,6 @@ const isAgentCategory = (value: string): value is AgentLearningCategory =>
 const isBreadcrumbCategory = (value: string): value is BreadcrumbLearningCategory =>
   (BREADCRUMB_CATEGORIES as readonly string[]).includes(value)
 
-const isSeverity = (value: string): value is (typeof LEARNING_SEVERITIES)[number] =>
-  (LEARNING_SEVERITIES as readonly string[]).includes(value)
-
 const collapse = (raw: string): string => decodeEntities(raw).trim().replace(/\s+/g, " ")
 
 const normalizeText = (raw: string, tag: TextTag, healed: string[]): string => {
@@ -593,6 +605,29 @@ type TimelineEntryInput = Extract<
   unknown
 >
 
+const isMarker = (value: string): value is TimelineMarker =>
+  (TIMELINE_MARKERS as readonly string[]).includes(value)
+
+/** The `<evidence><ref/></evidence>` block shared by timeline entries and learnings. */
+const evidenceOf = (
+  el: Element,
+  healed: string[],
+): Array<{ seq: number; messageId: string; what: string }> => {
+  const evidence: Array<{ seq: number; messageId: string; what: string }> = []
+  for (const child of el.children) {
+    if (child.name !== "evidence") continue
+    for (const ref of child.children) {
+      if (ref.name !== "ref") {
+        healed.push(`dropped misplaced <${ref.name}>`)
+        continue
+      }
+      const built = refFrom(ref, healed)
+      if (built !== null) evidence.push(built)
+    }
+  }
+  return evidence
+}
+
 const entryFrom = (entry: Element, healed: string[]): TimelineEntryInput | null => {
   const id = (entry.attrs.id ?? "").trim()
   const kind = (entry.attrs.kind ?? "").trim()
@@ -616,6 +651,10 @@ const entryFrom = (entry: Element, healed: string[]): TimelineEntryInput | null 
   }
   const tracks = listAttr(entry, "tracks")
   const tags = listAttr(entry, "tags")
+  // Deduplicate markers: a repeated value would fail the strict schema and cost the whole
+  // review, and the reader is here to make the model's output survive, not to audit it.
+  const markers = [...new Set((listAttr(entry, "markers") ?? []).filter(isMarker))]
+  const evidence = evidenceOf(entry, healed)
   return {
     id,
     kind,
@@ -626,6 +665,8 @@ const entryFrom = (entry: Element, healed: string[]): TimelineEntryInput | null 
     messageIds,
     ...(tracks === undefined ? {} : { tracks }),
     ...(tags === undefined ? {} : { tags }),
+    ...(markers.length === 0 ? {} : { markers }),
+    ...(evidence.length === 0 ? {} : { evidence }),
   }
 }
 
@@ -667,13 +708,32 @@ const audienceOf = (
   return truth
 }
 
-const severityOf = (learning: Element, healed: string[]): (typeof LEARNING_SEVERITIES)[number] => {
-  const claimed = (learning.attrs.severity ?? "").trim()
-  if (!isSeverity(claimed)) {
-    healed.push("defaulted severity on <learning>")
-    return "low"
+const isImpact = (value: string): boolean => (IMPACT_SCOPES as readonly string[]).includes(value)
+
+const isCompoundTarget = (value: string): boolean =>
+  (COMPOUND_TARGETS as readonly string[]).includes(value)
+
+/** Legacy severity words, healed forward to the tier they stood for ("low" was the default). */
+const LEGACY_SEVERITY_TIERS: Readonly<Record<string, number>> = {
+  low: 2,
+  medium: 3,
+  high: 4,
+}
+
+/**
+ * Severity is a 1–5 tier. A legacy word is healed forward (recorded), an unknown value
+ * defaults to 2 — the old "low" default — so a real observation never dies over its label.
+ */
+const severityOf = (learning: Element, healed: string[]): number => {
+  const raw = (learning.attrs.severity ?? "").trim().toLowerCase()
+  if (/^[1-5]$/.test(raw)) return Number(raw)
+  const legacy = LEGACY_SEVERITY_TIERS[raw]
+  if (legacy !== undefined) {
+    healed.push(`mapped legacy severity "${raw}" to tier ${legacy}`)
+    return legacy
   }
-  return claimed
+  healed.push("defaulted severity on <learning>")
+  return 2
 }
 
 const learningFrom = (
@@ -697,6 +757,18 @@ const learningFrom = (
     learning.attrs.cost === undefined
       ? undefined
       : normalizeText(learning.attrs.cost, "cost", healed)
+  const compoundWhy =
+    childText(learning, "compoundWhy") === ""
+      ? undefined
+      : normalizeText(childText(learning, "compoundWhy"), "compoundWhy", healed)
+  const impact = (learning.attrs.impact ?? "").trim()
+  const compoundTarget = (learning.attrs.compoundtarget ?? "").trim()
+  if (impact !== "" && !isImpact(impact)) {
+    healed.push(`ignored unknown impact "${impact}" on <learning>`)
+  }
+  if (compoundTarget !== "" && !isCompoundTarget(compoundTarget)) {
+    healed.push(`ignored unknown compound target "${compoundTarget}" on <learning>`)
+  }
   const nothing = title.startsWith(NOTHING_TO_CHANGE_PREFIX)
   // An unknown or missing category defaults instead of costing the entry — severity and
   // audience already heal this way, and a real observation should not die over its label.
@@ -710,18 +782,7 @@ const learningFrom = (
     effectiveCategory = DEFAULT_CATEGORY[section] as LearningInput["category"]
     healed.push(`defaulted category on <learning> to "${effectiveCategory}"`)
   }
-  const evidence: LearningInput["evidence"] = []
-  for (const child of learning.children) {
-    if (child.name !== "evidence") continue
-    for (const ref of child.children) {
-      if (ref.name !== "ref") {
-        healed.push(`dropped misplaced <${ref.name}>`)
-        continue
-      }
-      const built = refFrom(ref, healed)
-      if (built !== null) evidence.push(built)
-    }
-  }
+  const evidence = evidenceOf(learning, healed)
   // A nothing-entry exists to say "this audience came up empty" — an empty body must not
   // cost it. The title carries the meaning, so it stands in for the detail.
   const effectiveDetail = detail === "" && nothing ? title : detail
@@ -745,6 +806,9 @@ const learningFrom = (
     severity,
     ...(nextTime === "" && !nothing ? {} : { nextTime }),
     ...(cost === "" ? {} : { cost }),
+    ...(impact === "" || !isImpact(impact) ? {} : { impact }),
+    ...(compoundWhy === undefined ? {} : { compoundWhy }),
+    ...(compoundTarget === "" || !isCompoundTarget(compoundTarget) ? {} : { compoundTarget }),
     evidence,
   } as LearningInput
 }

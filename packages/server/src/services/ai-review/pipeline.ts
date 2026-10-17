@@ -31,6 +31,7 @@ import {
   validateBreadcrumb,
   validateGrounding,
   validateGroundingV2,
+  validateToolFailureChecklist,
 } from "@samskara/core"
 import type pino from "pino"
 import type { Db } from "../../db/client.js"
@@ -534,7 +535,7 @@ export const runAiReview = async (
               detail: "No breadcrumb earned a place: candidates were session-specific pointers",
               category: "tool",
               audience: "agent",
-              severity: "low",
+              severity: 2,
               evidence: [],
             },
           ],
@@ -542,28 +543,30 @@ export const runAiReview = async (
       }
     }
 
-    // 2. toolFailures cross-check: if the session had tool failures but no agent learning
-    // mentions failure/tool/retry counts, attach a deterministic recovered note (same
-    // mechanism the XML parser uses for healing lines).
+    // 2. toolFailures cross-check: the contract's rule, evaluated by core's guard so the
+    // prompt, the contract and this gate cannot drift. A session with failures but no agent
+    // learning about them is an incomplete review, and the note says so in the run ledger.
     const toolFailures = toolFailuresOf(sessionExport.records)
-    const hasToolFailures = Object.keys(toolFailures).length > 0
-    const agentLensIndex = payload.lenses.findIndex((lens) => lens.lens === "agentLearnings")
-    const agentLearnsAboutFailures =
-      agentLensIndex >= 0 &&
-      (
-        payload.lenses[agentLensIndex] as {
-          lens: "agentLearnings"
-          learnings: Array<{ title: string; detail: string }>
+    const toolFailureCount = Object.values(toolFailures).reduce((sum, count) => sum + count, 0)
+    const toolFailureCheck = validateToolFailureChecklist(payload, toolFailureCount)
+    if (!toolFailureCheck.ok) {
+      normalizationRecovered.push(`toolFailures checklist: ${toolFailureCheck.reason}`)
+    }
+
+    // 3. Compounding check: a severity >= 3 finding must name where its durable fix belongs.
+    // Every finding that clears the tier deserves a home; one with no target is the exact
+    // "never compounds" failure the analysis exists to prevent, so it is named here.
+    for (const lens of payload.lenses) {
+      if (lens.lens === "timeline") continue
+      for (const learning of lens.learnings) {
+        if (learning.title.startsWith("Nothing to change")) continue
+        if (learning.severity < 3) continue
+        if (learning.compoundTarget === undefined || learning.compoundTarget === "none") {
+          normalizationRecovered.push(
+            `compounding: severity ${learning.severity} learning "${learning.title}" names no target`,
+          )
         }
-      ).learnings.some((learning) =>
-        /\b(?:failure|fail(?:ed|ure)?|tool\s+fail|retry\s+fail|error\s+count|bash\s+fail)\b/i.test(
-          `${learning.title} ${learning.detail}`,
-        ),
-      )
-    if (hasToolFailures && !agentLearnsAboutFailures) {
-      normalizationRecovered.push(
-        "toolFailures cross-check: session had tool failures but no agent learning cites them",
-      )
+      }
     }
 
     // Fold normalization recoveries into the run's recovered ledger (persisted with the review).
@@ -589,6 +592,24 @@ export const runAiReview = async (
       // reviewer cites instead of recounting (real sessions fail Bash ~5% of calls and
       // almost nothing else — mined from 188 transcripts, 8511 calls, 2026-10-08).
       toolFailures,
+      /**
+       * The failures themselves, not just their counts — up to a dozen, each with the seq a
+       * reader can click through. The model may or may not mention them; the UI shows them
+       * regardless, so "what did the AI trip over" never depends on the AI noticing.
+       */
+      failedCalls: sessionExport.records
+        .filter(
+          (record) =>
+            record.msgType === "toolCall" &&
+            (record.status === "failure" || record.status === "cancelled"),
+        )
+        .slice(0, 12)
+        .map((record) => ({
+          seq: record.seq,
+          messageId: record.id,
+          tool: (record.toolName ?? "unknown").toLowerCase(),
+          status: record.status ?? "failure",
+        })),
       inputTokens: detail.tokenUsage.inputTokens,
       outputTokens: detail.tokenUsage.outputTokens,
       cachedTokens: detail.tokenUsage.cachedTokens,
@@ -596,7 +617,24 @@ export const runAiReview = async (
     }
     // Timeline durations derive from export record ts (epoch ms) at each entry's from/to
     // seq — attached server-side to the persisted copy only; the parsed payload stays
-    // contract-pure.
+    // contract-pure. `activeMs` is the same span with unattended gaps over an hour removed:
+    // an overnight wait is not work, and charging it to the entry that straddles it is how a
+    // 30-second edit reads as "98% of the session".
+    const IDLE_GAP_MS = 60 * 60_000
+    const activeMsInRange = (fromSeq: number, toSeq: number): number => {
+      let total = 0
+      let previous: number | undefined
+      for (let seq = fromSeq; seq <= toSeq; seq += 1) {
+        const ts = sessionExport.records[seq]?.ts
+        if (ts === undefined) continue
+        if (previous !== undefined) {
+          const delta = ts - previous
+          if (delta > 0 && delta <= IDLE_GAP_MS) total += delta
+        }
+        previous = ts
+      }
+      return total
+    }
     const tsAt = (seq: number): number | undefined => sessionExport.records[seq]?.ts
     const tsRecords = sessionExport.records.filter((record) => record.ts !== undefined)
     const firstTs = tsRecords[0]?.ts
@@ -618,6 +656,7 @@ export const runAiReview = async (
                 ...(startMs !== undefined && endMs !== undefined
                   ? { durationMs: endMs - startMs }
                   : {}),
+                activeMs: activeMsInRange(entry.fromSeq, entry.toSeq),
               }
             }),
           }
@@ -705,6 +744,10 @@ const persistLearnings = async (
         title: learning.title,
         detail: learning.detail,
         evidence: learning.evidence as unknown as object,
+        // The compounding target is the whole point of a severity tier: it is what routes a
+        // finding to an artifact instead of leaving it to rot in a list. Stored on the same
+        // row (learnings.route) so the Learnings page and `samskara learn` can act on it.
+        ...(learning.compoundTarget === undefined ? {} : { route: learning.compoundTarget }),
         // Same hash core's extractor fingerprints with (audience:category:subject); the AI
         // lens categories are wider than the extractor's closed enum, but the hash only
         // concatenates strings, so the cast narrows a type, not a behavior.

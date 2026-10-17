@@ -278,6 +278,7 @@ describe.skipIf(localServerUrl() === undefined && !dockerAvailable())("ai review
       recordCount: 2,
       toolCallCount: 0,
       toolFailures: {},
+      failedCalls: [],
       inputTokens: 0,
       outputTokens: 0,
       cachedTokens: 0,

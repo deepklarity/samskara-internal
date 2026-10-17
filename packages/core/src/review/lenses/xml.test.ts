@@ -20,7 +20,7 @@ const filledXml = `<?xml version="1.0" encoding="UTF-8"?>
     </entry>
   </timeline>
   <humanLearnings>
-    <learning category="communication" audience="human" severity="medium" cost="95s of 278s">
+    <learning category="communication" audience="human" severity="3" cost="95s of 278s">
       <title>Name the file to touch</title>
       <detail>The first prompt omitted the path, so the agent guessed wrong.</detail>
       <nextTime>Open the task by naming the exact file to change.</nextTime>
@@ -32,7 +32,7 @@ const filledXml = `<?xml version="1.0" encoding="UTF-8"?>
     </learning>
   </humanLearnings>
   <agentLearnings>
-    <learning category="approach" audience="agent" severity="low">
+    <learning category="approach" audience="agent" severity="2">
       <title>Read the test before editing source</title>
       <detail>The tests named the exact convention the edit broke.</detail>
       <nextTime>Read the covering test before editing the source it guards.</nextTime>
@@ -44,7 +44,7 @@ const filledXml = `<?xml version="1.0" encoding="UTF-8"?>
     </learning>
   </agentLearnings>
   <breadcrumbs>
-    <learning category="query" audience="agent" severity="low" cost="40s of 278s">
+    <learning category="query" audience="agent" severity="2" cost="40s of 278s">
       <title>Failed-jobs lookup</title>
       <detail>The psql query lists failed jobs with their last error, so nobody re-derives it.</detail>
       <nextTime>Reach for this before writing a new query against the jobs table.</nextTime>
@@ -83,7 +83,7 @@ const goldenLenses = [
         detail: "The first prompt omitted the path, so the agent guessed wrong.",
         category: "communication",
         audience: "human",
-        severity: "medium",
+        severity: 3,
         cost: "95s of 278s",
         nextTime: "Open the task by naming the exact file to change.",
         evidence: [{ seq: 7, messageId: "msg-7", what: "the agent edited the wrong file" }],
@@ -98,7 +98,7 @@ const goldenLenses = [
         detail: "The tests named the exact convention the edit broke.",
         category: "approach",
         audience: "agent",
-        severity: "low",
+        severity: 2,
         nextTime: "Read the covering test before editing the source it guards.",
         evidence: [
           { seq: 12, messageId: "msg-12", what: "the failing test run pointed at the convention" },
@@ -114,7 +114,7 @@ const goldenLenses = [
         detail: "The psql query lists failed jobs with their last error, so nobody re-derives it.",
         category: "query",
         audience: "agent",
-        severity: "low",
+        severity: 2,
         cost: "40s of 278s",
         nextTime: "Reach for this before writing a new query against the jobs table.",
         evidence: [{ seq: 2, messageId: "msg-2", what: "the query was worked out here" }],
@@ -333,17 +333,30 @@ describe("parseReviewXml — learning vocabulary", () => {
     expect(result.recovered).toContain("corrected audience on <learning> to match <humanLearnings>")
   })
 
-  test("X12: a missing or invalid severity is defaulted to low and recorded", () => {
+  test("X12: a missing or invalid severity is defaulted to tier 2 and recorded", () => {
     const text = filledXml.replace(
-      'category="query" audience="agent" severity="low"',
+      'category="query" audience="agent" severity="2"',
       'category="query" audience="agent" severity="extreme"',
     )
     const result = parseReviewXml(text)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     const breadcrumb = result.value.lenses.find((lens) => lens.lens === "breadcrumbs")
-    expect(breadcrumb?.learnings[0]?.severity).toBe("low")
+    expect(breadcrumb?.learnings[0]?.severity).toBe(2)
     expect(result.recovered).toContain("defaulted severity on <learning>")
+  })
+
+  test("X12b: a legacy severity word is healed forward to its tier and recorded", () => {
+    const text = filledXml.replace(
+      'category="query" audience="agent" severity="2"',
+      'category="query" audience="agent" severity="high"',
+    )
+    const result = parseReviewXml(text)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const breadcrumb = result.value.lenses.find((lens) => lens.lens === "breadcrumbs")
+    expect(breadcrumb?.learnings[0]?.severity).toBe(4)
+    expect(result.recovered).toContain('mapped legacy severity "high" to tier 4')
   })
 
   test("X13: a learning missing nextTime is dropped by name (never silently)", () => {
@@ -366,7 +379,7 @@ describe("parseReviewXml — learning vocabulary", () => {
   })
 
   test("X14: a nothing-entry may carry an empty nextTime and no evidence", () => {
-    const nothing = `    <learning category="process" audience="agent" severity="low">
+    const nothing = `    <learning category="process" audience="agent" severity="2">
       <title>${NOTHING_TO_CHANGE_PREFIX} for the agent</title>
       <detail>The agent worked well; no change worth asking for.</detail>
       <nextTime></nextTime>
@@ -386,7 +399,7 @@ describe("parseReviewXml — learning vocabulary", () => {
         detail: "The agent worked well; no change worth asking for.",
         category: "process",
         audience: "agent",
-        severity: "low",
+        severity: 2,
         nextTime: "",
         evidence: [],
       },
@@ -511,12 +524,12 @@ describe("parseReviewXml — healing carries forward", () => {
   test("X23: over-long text is truncated to its schema max and recorded", () => {
     const text = filledXml.replace(
       "The session shipped a small fix after one mid-course correction.",
-      "x".repeat(700),
+      "x".repeat(1300),
     )
     const result = parseReviewXml(text)
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.value.summary).toHaveLength(600)
+      expect(result.value.summary).toHaveLength(1200)
       expect(result.recovered).toContain("truncated summary")
     }
   })

@@ -8,7 +8,7 @@ describe("validateBreadcrumb", () => {
       detail: "SELECT * FROM jobs WHERE status = 'failed' ORDER BY updated_at DESC LIMIT 20",
       category: "query",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Reach for this before writing a new query against the jobs table.",
       evidence: [{ seq: 14, messageId: "msg-14", what: "the query was worked out here" }],
     })
@@ -22,7 +22,7 @@ describe("validateBreadcrumb", () => {
       detail: "Check writeup/self-learning/RESUME.md for the next task after the refactor.",
       category: "path",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Read the RESUME file to find the next task.",
       evidence: [{ seq: 5, messageId: "msg-5", what: "agent looked at RESUME" }],
     })
@@ -38,7 +38,7 @@ describe("validateBreadcrumb", () => {
       detail: "The RESUME file documents the AFM verification steps for sim-mode.",
       category: "procedure",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Follow the RESUME file steps for AFM verification.",
       evidence: [{ seq: 10, messageId: "msg-10", what: "AFM verification documented" }],
     })
@@ -52,7 +52,7 @@ describe("validateBreadcrumb", () => {
       detail: "Work on feat/user-authentication branch for the auth refactor.",
       category: "path",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Check feat/user-authentication for the latest changes.",
       evidence: [{ seq: 3, messageId: "msg-3", what: "branch mentioned" }],
     })
@@ -66,7 +66,7 @@ describe("validateBreadcrumb", () => {
       detail: "Follow the pr-29 checklist for the review process.",
       category: "procedure",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Use pr-29 checklist for future reviews.",
       evidence: [{ seq: 7, messageId: "msg-7", what: "PR checklist mentioned" }],
     })
@@ -80,7 +80,7 @@ describe("validateBreadcrumb", () => {
       detail: "Update docs/architecture/decisions.md when making changes.",
       category: "path",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Edit docs/architecture/decisions.md for architecture decisions.",
       evidence: [{ seq: 2, messageId: "msg-2", what: "docs path mentioned" }],
     })
@@ -96,7 +96,7 @@ describe("validateBreadcrumb", () => {
       detail: "See writeup/project/overview.md for the project overview.",
       category: "path",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Read writeup/project/overview.md for context.",
       evidence: [{ seq: 1, messageId: "msg-1", what: "writeup mentioned" }],
     })
@@ -112,7 +112,7 @@ describe("validateBreadcrumb", () => {
       detail: "The helper lives at packages/core/src/utils/helpers.ts",
       category: "path",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Import from packages/core/src/utils/helpers.ts",
       evidence: [{ seq: 4, messageId: "msg-4", what: "helper path mentioned" }],
     })
@@ -128,7 +128,7 @@ describe("validateBreadcrumb", () => {
       detail: "psql -c \"SELECT * FROM jobs WHERE status = 'failed'\"",
       category: "command",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Run this command to list failed jobs.",
       evidence: [{ seq: 8, messageId: "msg-8", what: "command worked out" }],
     })
@@ -142,7 +142,7 @@ describe("validateBreadcrumb", () => {
       detail: "Run the down migration script, then verify schema version.",
       category: "procedure",
       audience: "agent",
-      severity: "medium",
+      severity: 3,
       nextTime: "Follow these steps to rollback a failed migration.",
       evidence: [{ seq: 12, messageId: "msg-12", what: "rollback procedure worked out" }],
     })
@@ -157,7 +157,7 @@ describe("validateBreadcrumb", () => {
         "Check writeup/self-learning/RESUME.md for pr-29 details on feat/authentication branch.",
       category: "path",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Review the RESUME file.",
       evidence: [{ seq: 1, messageId: "msg-1", what: "multiple refs" }],
     })
@@ -171,7 +171,7 @@ describe("validateBreadcrumb", () => {
       detail: "Use pr-123-feature-name for feature branches.",
       category: "procedure",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Follow the pr-XXX naming pattern.",
       evidence: [{ seq: 1, messageId: "msg-1", what: "branch naming mentioned" }],
     })
@@ -185,7 +185,7 @@ describe("validateBreadcrumb", () => {
       detail: "Work done on fix/critical-bug branch.",
       category: "path",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Check fix/critical-bug for the hotfix.",
       evidence: [{ seq: 1, messageId: "msg-1", what: "fix branch mentioned" }],
     })
@@ -199,7 +199,7 @@ describe("validateBreadcrumb", () => {
       detail: "Updates on chore/dependency-updates branch.",
       category: "path",
       audience: "agent",
-      severity: "low",
+      severity: 2,
       nextTime: "Review chore/dependency-updates.",
       evidence: [{ seq: 1, messageId: "msg-1", what: "chore branch mentioned" }],
     })
